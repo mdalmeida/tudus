@@ -561,7 +561,7 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
   return (
     <main style={{display:"flex",flexDirection:"column",gap:12}}>
       <div>
-        <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0}}>Buenos días ✦</h1>
+        <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0}}>Buenas tardes ✦</h1>
         <p style={{fontSize:12,color:c.textFaint,marginTop:2,marginBottom:0}}>Sábado 14 de marzo · Planificá tu día</p>
       </div>
       <div style={{display:"flex",gap:8}}>
