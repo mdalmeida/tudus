@@ -1068,7 +1068,7 @@ function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
   return (
     <nav aria-label="Navegación principal" style={{width:collapsed?44:196,flexShrink:0,background:c.surface,borderRight:`1px solid ${c.border}`,display:"flex",flexDirection:"column",transition:"width .2s",overflow:"hidden"}}>
       <button type="button" aria-label={collapsed?"Expandir":"Colapsar"} onClick={onToggle}
-        style={{display:"flex",justifyContent:collapsed?"center":"flex-end",padding:"6px 10px",cursor:"pointer",color:c.textFaint,borderBottom:`1px solid ${c.border}`,fontSize:14,height:36,alignItems:"center",background:"none",border:"none",borderBottom:`1px solid ${c.border}`,width:"100%"}}>
+        style={{display:"flex",justifyContent:collapsed?"center":"flex-end",padding:"6px 10px",cursor:"pointer",color:c.textFaint,fontSize:14,height:36,alignItems:"center",background:"none",border:"none",borderBottom:`1px solid ${c.border}`,width:"100%"}}>
         {collapsed?"›":"‹"}
       </button>
       <div style={{flex:1,overflowY:"auto",padding:"6px 0",display:"flex",flexDirection:"column"}}>
