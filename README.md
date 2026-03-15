@@ -11,7 +11,7 @@ App de productividad personal — mix entre TickTick, Notion y Google Keep.
 ```
 tudus/
 ├── src/
-│   └── App.tsx          # Prototipo React completo
+│   └── app.tsx          # Prototipo React completo
 ├── docs/
 │   ├── PRD.md           # Definición de producto
 │   └── ANALYSIS.md      # Análisis funcional y técnico
