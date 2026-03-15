@@ -1,2 +1,2 @@
 # tudus
-Repo de tudús
+Esto es un repositorio del proyecto tudús 
