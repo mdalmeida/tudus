@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useRef, useEffect } from "react";
 
 const BRAND = "#75b0e4";
