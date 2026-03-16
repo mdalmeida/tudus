@@ -8,7 +8,7 @@ Vercel (auto-deploy en push a main). URL: tudus-zeta.vercel.app
 - Dark mode: inputs y selects deben respetar tema (no hardcodear #F9FAFB)
 - No duplicar keys en objetos de estilos
 ## Pendientes
-- [ ] Inputs dark mode fix
+- [x] Inputs dark mode fix
 - [ ] TuduDetail: sacar botón editar del header, dejar solo el de abajo
 - [ ] TuduForm: sacar estado "Terminando"
 - [ ] Pomodoro: elegir tareas existentes
