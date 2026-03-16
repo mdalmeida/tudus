@@ -209,11 +209,13 @@ function Fld({label,id,children}) {
     </div>
   );
 }
-function Inp({id,...props}) {
-  return <input id={id} {...props} style={{width:"100%",padding:"6px 10px",fontSize:12,border:"1px solid #E5E7EB",borderRadius:7,background:"#F9FAFB",color:"#111827",outline:"none",fontFamily:"inherit",...(props.style||{})}}/>;
+function Inp({id,dark:dk,...props}) {
+  const c = th(dk||false);
+  return <input id={id} {...props} style={{width:"100%",padding:"6px 10px",fontSize:12,border:`1px solid ${c.border}`,borderRadius:7,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit",...(props.style||{})}}/>;
 }
-function Sel({id,children,...props}) {
-  return <select id={id} {...props} style={{width:"100%",padding:"6px 10px",fontSize:12,border:"1px solid #E5E7EB",borderRadius:7,background:"#F9FAFB",color:"#111827",outline:"none",fontFamily:"inherit"}}>{children}</select>;
+function Sel({id,dark:dk,children,...props}) {
+  const c = th(dk||false);
+  return <select id={id} {...props} style={{width:"100%",padding:"6px 10px",fontSize:12,border:`1px solid ${c.border}`,borderRadius:7,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>{children}</select>;
 }
 function useToastInstance() { return useToast(); }
 
@@ -263,21 +265,21 @@ function TuduForm({title,action,onClose,dark:dk}) {
         <h2 id={titleId} style={{fontSize:14,fontWeight:500,margin:0}}>{title}</h2>
         <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:"#9CA3AF"}}>✕</button>
       </div>
-      <Fld label="Título" id="f-title"><Inp id="f-title" placeholder="¿Qué tenés que hacer?" autoFocus/></Fld>
+      <Fld label="Título" id="f-title"><Inp id="f-title" dark={dk} placeholder="¿Qué tenés que hacer?" autoFocus/></Fld>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo">{TUDU_TYPES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
-        <Fld label="Categoría" id="f-cat"><Sel id="f-cat">{CATEGORIAS_NAMES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk}>{TUDU_TYPES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Categoría" id="f-cat"><Sel id="f-cat" dark={dk}>{CATEGORIAS_NAMES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Estado" id="f-estado"><Sel id="f-estado">{ESTADOS_DEFAULT.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Estado" id="f-estado"><Sel id="f-estado" dark={dk}>{ESTADOS_DEFAULT.filter(v=>v!=="Terminando").map(v=><option key={v}>{v}</option>)}</Sel></Fld>
         <Fld label="Cuándo" id="f-cuando">
-          <Sel id="f-cuando" value={cuando} onChange={e=>setCuando(e.target.value)}>{CUANDO.map(v=><option key={v}>{v}</option>)}</Sel>
+          <Sel id="f-cuando" dark={dk} value={cuando} onChange={e=>setCuando(e.target.value)}>{CUANDO.map(v=><option key={v}>{v}</option>)}</Sel>
           {dateHint&&<div style={{fontSize:10,color:BRAND,marginTop:3}}>→ {dateHint}</div>}
         </Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Deadline" id="f-dl"><Inp id="f-dl" type="date"/></Fld>
-        <Fld label="Tudú padre" id="f-padre"><Sel id="f-padre"><option>— Ninguno —</option><option>Proyecto Alpha</option></Sel></Fld>
+        <Fld label="Deadline" id="f-dl"><Inp id="f-dl" dark={dk} type="date"/></Fld>
+        <Fld label="Tudú padre" id="f-padre"><Sel id="f-padre" dark={dk}><option>— Ninguno —</option><option>Proyecto Alpha</option></Sel></Fld>
       </div>
       <Fld label="Ícono" id="f-icon"><IconPicker value={selIcon} onChange={setSelIcon}/></Fld>
       <Fld label="Color" id="f-color">
@@ -298,7 +300,7 @@ function TuduForm({title,action,onClose,dark:dk}) {
           ))}
         </div>
       </Fld>
-      <Fld label="Etiquetas" id="f-tags"><Inp id="f-tags" placeholder="trabajo, urgente... (coma)"/></Fld>
+      <Fld label="Etiquetas" id="f-tags"><Inp id="f-tags" dark={dk} placeholder="trabajo, urgente... (coma)"/></Fld>
       <Fld label="Contenido" id="f-content"><WysiwygEditor id="f-content" placeholder="Escribí acá..."/></Fld>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
         <Btn ghost onClick={onClose}>Cancelar</Btn>
@@ -380,7 +382,7 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
         )}
         <div style={{display:"flex",gap:6}}>
           <label htmlFor="new-subtask" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"}}>Nueva subtarea</label>
-          <Inp id="new-subtask" value={newSub} onChange={e=>setNewSub(e.target.value)} placeholder="Nueva subtarea..."
+          <Inp id="new-subtask" dark={dk} value={newSub} onChange={e=>setNewSub(e.target.value)} placeholder="Nueva subtarea..."
             onKeyDown={e=>{if(e.key==="Enter")addSub();}} style={{flex:1}}/>
           <Btn sm onClick={addSub}>+ Sub</Btn>
         </div>
