@@ -565,7 +565,7 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
     <main style={{display:"flex",flexDirection:"column",gap:12}}>
       <div>
         <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0}}>Buenas tardes ✦</h1>
-        <p style={{fontSize:12,color:c.textFaint,marginTop:2,marginBottom:0}}>Sábado 14 de marzo · Planificá tu día</p>
+        <p style={{fontSize:12,color:c.textFaint,marginTop:2,marginBottom:0}}>{new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})} · Planificá tu día</p>
       </div>
       <div style={{display:"flex",gap:8}}>
         <label htmlFor="quick-create" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"}}>Crear tudú rápido</label>
@@ -1116,7 +1116,7 @@ function BottomNav({screen,onNav,dark:dk}) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [dark,setDark]           = useState(false);
+  const [dark,setDark]           = useState(true);
   const [screen,setScreen]       = useState("dashboard");
   const [collapsed,setCollapsed] = useState(false);
   const [showNew,setShowNew]     = useState(false);
