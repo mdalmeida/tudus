@@ -121,7 +121,7 @@ function useToast() {
   const [msg,setMsg] = useState(null);
   const show = m=>{setMsg(m);setTimeout(()=>setMsg(null),2200);};
   const Toast = ()=>msg
-    ? <div role="status" aria-live="polite" style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",background:"#111",color:"#fff",padding:"6px 16px",borderRadius:8,fontSize:12,zIndex:999,pointerEvents:"none",whiteSpace:"nowrap"}}>{msg}</div>
+    ? <div role="status" aria-live="polite" style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",background:"#111",color:"#fff",padding:"6px 16px",borderRadius:8,fontSize:14,zIndex:999,pointerEvents:"none",whiteSpace:"nowrap"}}>{msg}</div>
     : null;
   return {show,Toast};
 }
@@ -198,11 +198,11 @@ function Fld({label,id,children}) {
 }
 function Inp({id,dark:dk,...props}) {
   const c = th(dk||false);
-  return <input id={id} {...props} style={{width:"100%",padding:"6px 10px",fontSize:12,border:`1px solid ${c.border}`,borderRadius:7,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit",...(props.style||{})}}/>;
+  return <input id={id} {...props} style={{width:"100%",padding:"8px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:7,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit",...(props.style||{})}}/>;
 }
 function Sel({id,dark:dk,children,...props}) {
   const c = th(dk||false);
-  return <select id={id} {...props} style={{width:"100%",padding:"6px 10px",fontSize:12,border:`1px solid ${c.border}`,borderRadius:7,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>{children}</select>;
+  return <select id={id} {...props} style={{width:"100%",padding:"8px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:7,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>{children}</select>;
 }
 function useToastInstance() { return useToast(); }
 
@@ -232,7 +232,7 @@ function WysiwygEditor({placeholder,id}) {
       </div>
       <div ref={ref} id={id} contentEditable suppressContentEditableWarning
         role="textbox" aria-multiline="true" data-placeholder={placeholder||"Escribí acá..."}
-        style={{minHeight:100,padding:"8px 12px",fontSize:12,lineHeight:1.7,outline:"none",color:"#111",background:"#fff"}}/>
+        style={{minHeight:100,padding:"8px 12px",fontSize:14,lineHeight:1.7,outline:"none",color:"#111",background:"#fff"}}/>
       <style>{`[contenteditable]:empty:before{content:attr(data-placeholder);color:#9CA3AF;pointer-events:none}[contenteditable] h3{font-size:13px;font-weight:600;margin:4px 0}[contenteditable] ul{list-style:disc;padding-left:18px;margin:4px 0}[contenteditable] ol{list-style:decimal;padding-left:18px;margin:4px 0}[contenteditable] a{color:#3B82F6;text-decoration:underline}[contenteditable] strong{font-weight:700}[contenteditable] em{font-style:italic}*:focus-visible{outline:2px solid ${BRAND};outline-offset:2px}`}</style>
     </div>
   );
@@ -331,20 +331,20 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
         <div style={{background:c.surface2,borderRadius:7,padding:"7px 10px",border:`1px solid ${c.border}`}}>
           <label htmlFor="det-status" style={{fontSize:10,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3,display:"block"}}>Estado</label>
           <select id="det-status" value={status} onChange={e=>setStatus(e.target.value)}
-            style={{border:"none",background:"transparent",padding:0,fontSize:12,color:c.text,cursor:"pointer",width:"100%",outline:"none"}}>
+            style={{border:"none",background:"transparent",padding:0,fontSize:14,color:c.text,cursor:"pointer",width:"100%",outline:"none"}}>
             {ESTADOS_DEFAULT.map(s=><option key={s}>{s}</option>)}
           </select>
         </div>
         {[["Fecha","Hoy — 14 mar"],["Tipo","📋 Tarea"],["Pomodoros","2 · 45 min"]].map(([l,v])=>(
           <div key={l} style={{background:c.surface2,borderRadius:7,padding:"7px 10px",border:`1px solid ${c.border}`}}>
             <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>{l}</div>
-            <div style={{fontSize:12,color:c.text}}>{v}</div>
+            <div style={{fontSize:14,color:c.text}}>{v}</div>
           </div>
         ))}
       </div>
 
       {/* content */}
-      <div style={{background:c.surface2,borderRadius:8,padding:12,marginBottom:12,fontSize:12,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`}}>
+      <div style={{background:c.surface2,borderRadius:8,padding:12,marginBottom:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`}}>
         <strong style={{color:c.text}}>Agenda de la reunión</strong><br/><br/>
         • Revisar avances del sprint<br/>• Definir prioridades<br/>• Bloqueantes del equipo
       </div>
@@ -359,7 +359,7 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
                 <input type="checkbox" id={"sub-"+sub.id} checked={sub.done}
                   onChange={()=>setSubtasks(p=>p.map(s=>s.id===sub.id?{...s,done:!s.done}:s))}
                   style={{accentColor:BRAND,cursor:"pointer",flexShrink:0}}/>
-                <label htmlFor={"sub-"+sub.id} style={{flex:1,fontSize:12,cursor:"pointer",color:sub.done?c.textFaint:c.text,textDecoration:sub.done?"line-through":"none"}}>{sub.title}</label>
+                <label htmlFor={"sub-"+sub.id} style={{flex:1,fontSize:14,cursor:"pointer",color:sub.done?c.textFaint:c.text,textDecoration:sub.done?"line-through":"none"}}>{sub.title}</label>
                 <button type="button" aria-label={"Eliminar "+sub.title}
                   onClick={()=>setSubtasks(p=>p.filter(s=>s.id!==sub.id))}
                   style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:14,padding:0,lineHeight:1}}>×</button>
@@ -380,7 +380,7 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
         style={{display:"flex",alignItems:"center",gap:8,background:c.surface2,borderRadius:8,padding:"8px 12px",cursor:"pointer",border:`1px solid ${c.border}`,width:"100%",textAlign:"left",marginBottom:10,fontFamily:"inherit"}}>
         <div style={{width:28,height:28,borderRadius:"50%",background:"#FEE2E2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>⏱</div>
         <div style={{flex:1}}>
-          <div style={{fontSize:12,fontWeight:500,color:c.text}}>Iniciar Pomodoro</div>
+          <div style={{fontSize:14,fontWeight:500,color:c.text}}>Iniciar Pomodoro</div>
           <div style={{fontSize:11,color:c.textFaint}}>25 min de foco</div>
         </div>
         <span style={{color:c.border}}>›</span>
@@ -435,7 +435,7 @@ function PomoWidget({onClose,onOpenTask,isMobile,dark:dk}) {
   if(mini) return (
     <button type="button" aria-label="Expandir pomodoro" role="timer" onClick={()=>setMini(false)}
       style={{position:"fixed",bottom,right,background:c.surface,border:`1px solid ${c.border}`,borderRadius:20,padding:"5px 14px",zIndex:40,boxShadow:"0 2px 10px rgba(0,0,0,0.12)",display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontFamily:"inherit"}}>
-      <span style={{fontSize:12,fontWeight:600,color:BRAND}}>⏱ {mm}:{ss}</span>
+      <span style={{fontSize:14,fontWeight:600,color:BRAND}}>⏱ {mm}:{ss}</span>
       <span style={{fontSize:11,color:c.textMuted,maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{active?.title}</span>
       <span style={{fontSize:9,color:c.textFaint}}>↑</span>
     </button>
@@ -465,7 +465,7 @@ function PomoWidget({onClose,onOpenTask,isMobile,dark:dk}) {
           </button>
           <span style={{fontSize:10,color:c.textFaint,flexShrink:0}}>{Math.floor(task.secs/60)}m</span>
           <button type="button" aria-label={"Quitar "+task.title} onClick={e=>{e.stopPropagation();removeTask(task.id);}}
-            style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:12,padding:0,lineHeight:1,flexShrink:0}}>×</button>
+            style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:14,padding:0,lineHeight:1,flexShrink:0}}>×</button>
         </div>
       ))}
 
@@ -480,13 +480,13 @@ function PomoWidget({onClose,onOpenTask,isMobile,dark:dk}) {
         <div style={{marginTop:4,border:`1px solid ${c.border}`,borderRadius:8,overflow:"hidden",background:c.surface}}>
           <div style={{padding:"4px 8px",borderBottom:`1px solid ${c.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontSize:10,color:c.textFaint,fontWeight:500}}>Elegí una tarea</span>
-            <button type="button" onClick={()=>setPicking(false)} style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:12,padding:0}}>✕</button>
+            <button type="button" onClick={()=>setPicking(false)} style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:14,padding:0}}>✕</button>
           </div>
           {available.length===0
             ? <p style={{fontSize:11,color:c.textFaint,padding:"8px",margin:0,textAlign:"center"}}>No hay más tareas disponibles</p>
             : available.map(task=>(
               <button key={task.id} type="button" onClick={()=>addTask(task)}
-                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 10px",background:"none",border:"none",
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 12px",background:"none",border:"none",
                   borderBottom:`1px solid ${c.border}`,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                 <div style={{width:8,height:8,borderRadius:"50%",background:task.color,flexShrink:0}}/>
                 <span style={{fontSize:11,color:c.text,flex:1}}>{task.title}</span>
@@ -551,12 +551,12 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
   return (
     <main style={{display:"flex",flexDirection:"column",gap:12}}>
       <div>
-        <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0}}>Buenas tardes ✦</h1>
-        <p style={{fontSize:12,color:c.textFaint,marginTop:2,marginBottom:0}}>{new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})} · Planificá tu día</p>
+        <h1 style={{fontSize:17,fontWeight:500,color:c.text,margin:0}}>Buenas tardes ✦</h1>
+        <p style={{fontSize:14,color:c.textFaint,marginTop:2,marginBottom:0}}>{new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})} · Planificá tu día</p>
       </div>
       <div style={{display:"flex",gap:8}}>
         <label htmlFor="quick-create" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"}}>Crear tudú rápido</label>
-        <input id="quick-create" style={{flex:1,padding:"6px 12px",fontSize:12,border:`1px solid ${c.border}`,borderRadius:8,outline:"none",fontFamily:"inherit",background:c.surface,color:c.text}}
+        <input id="quick-create" style={{flex:1,padding:"6px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:8,outline:"none",fontFamily:"inherit",background:c.surface,color:c.text}}
           placeholder="Nuevo tudú rápido... (Enter)"
           onKeyDown={e=>{if(e.key==="Enter"&&e.target.value.trim()){show("Tudú creado en Inbox");e.target.value="";}}}/>
         <Btn onClick={onNew}>+ Nuevo</Btn>
@@ -582,7 +582,7 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
       {pool.length>0&&(
         <section style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:10,padding:12}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-            <h2 style={{fontSize:12,fontWeight:500,color:c.text,margin:0}}>Vencidos / Sin planificar</h2>
+            <h2 style={{fontSize:14,fontWeight:500,color:c.text,margin:0}}>Vencidos / Sin planificar</h2>
             <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"#FEE2E2",color:"#DC2626"}}>{pool.length} pendientes</span>
           </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
@@ -618,7 +618,7 @@ function ListView({title,onTudu,dark:dk}) {
   const drag = useRef(null);
   return (
     <main style={{display:"flex",flexDirection:"column",gap:10}}>
-      <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0}}>{title}</h1>
+      <h1 style={{fontSize:17,fontWeight:500,color:c.text,margin:0}}>{title}</h1>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
         {["Todos los estados","Todos los tipos","Cualquier fecha"].map(o=>(
           <select key={o} aria-label={o} style={{fontSize:11,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
@@ -635,11 +635,11 @@ function ListView({title,onTudu,dark:dk}) {
               if(drag.current===null||drag.current===i) return;
               const n=[...order];const[m]=n.splice(drag.current,1);n.splice(i,0,m);setOrder(n);drag.current=null;
             }}
-            style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:c.surface,border:`1px solid ${c.border}`,borderRadius:7,marginBottom:4}}>
+            style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:c.surface,border:`1px solid ${c.border}`,borderRadius:7,marginBottom:4}}>
             <span style={{color:c.border2,cursor:"grab",fontSize:13}}>⠿</span>
             <div style={{width:12,height:12,borderRadius:"50%",border:`2px solid ${item.done?"#22C55E":c.border2}`,background:item.done?"#22C55E":"transparent",flexShrink:0}}/>
             <span style={{fontSize:11}}>{item.type}</span>
-            <button type="button" onClick={onTudu} style={{flex:1,fontSize:12,textDecoration:item.done?"line-through":"none",color:item.done?c.textFaint:c.text,background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>{item.title}</button>
+            <button type="button" onClick={onTudu} style={{flex:1,fontSize:14,textDecoration:item.done?"line-through":"none",color:item.done?c.textFaint:c.text,background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>{item.title}</button>
             <span style={{fontSize:10,color:c.textFaint}}>{item.cat}</span>
             <SBadge s={item.status}/>
             <span style={{fontSize:11,color:c.textFaint}}>{item.date}</span>
@@ -695,7 +695,7 @@ function CategoryView({onView,onTudu}) {
           </button>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
             {pill(<div style={{padding:"6px 9px",fontSize:11,color:"#fff",lineHeight:1.4}}>Enfocarme en proyectos de impacto real. Delegar lo operativo.</div>,155)}
-            {pill(<div style={{padding:"6px 10px",fontSize:11,color:"#fff",fontStyle:"italic",lineHeight:1.4,borderLeft:"2px solid rgba(255,255,255,0.35)"}}>"Productividad es hacer lo que importa."</div>,155)}
+            {pill(<div style={{padding:"8px 12px",fontSize:11,color:"#fff",fontStyle:"italic",lineHeight:1.4,borderLeft:"2px solid rgba(255,255,255,0.35)"}}>"Productividad es hacer lo que importa."</div>,155)}
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
             <div style={{width:115,height:58,borderRadius:7,background:"linear-gradient(135deg,#f093fb,#f5576c)",display:"flex",alignItems:"center",justifyContent:"center",color:"rgba(255,255,255,0.8)",fontSize:11}}>📸 Inspiración</div>
@@ -776,7 +776,7 @@ function KanbanView({init,onTudu,dark:dk}) {
           {(cards||[]).length===0&&<p style={{fontSize:11,color:c.textFaint,textAlign:"center",padding:"8px 0",margin:0}}>Sin tudús</p>}
           {(cards||[]).map(item=>(
             <div key={item.id} draggable onDragStart={()=>onDS(col,item.id)} onDragEnd={()=>{drag.current=null;}}
-              style={{background:c.surface,border:`0.5px solid ${c.border}`,borderLeft:`3px solid ${item.lc}`,borderRadius:6,padding:"6px 8px",marginBottom:4,cursor:"grab",fontSize:12}}>
+              style={{background:c.surface,border:`0.5px solid ${c.border}`,borderLeft:`3px solid ${item.lc}`,borderRadius:6,padding:"6px 8px",marginBottom:4,cursor:"grab",fontSize:14}}>
               <div style={{fontSize:10,color:c.textFaint}}>{item.type}</div>
               <button type="button" onClick={onTudu} style={{display:"block",fontWeight:500,fontSize:11,color:c.text,background:"none",border:"none",cursor:"pointer",padding:0,textAlign:"left",width:"100%"}}>{item.title}</button>
               <div style={{fontSize:10,color:c.textFaint,marginTop:2}}>{item.date}</div>
@@ -826,7 +826,7 @@ function GanttView({dark:dk}) {
         </div>
       </div>
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:14,minWidth:400}}>
           <thead>
             <tr>
               <th style={{textAlign:"left",padding:"4px 8px",fontSize:10,color:c.textFaint,fontWeight:400,borderBottom:`1px solid ${c.border}`,width:"28%"}}>Tudú</th>
@@ -891,7 +891,7 @@ function CanvasView({onNew,onTudu,dark:dk,isMobile}) {
   return (
     <main style={{display:"flex",flexDirection:"column",gap:12}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-        <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0}}>💼 My Work</h1>
+        <h1 style={{fontSize:17,fontWeight:500,color:c.text,margin:0}}>💼 My Work</h1>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <Btn sm onClick={onNew}>+ Nuevo Tudú</Btn>
           <div style={{display:"flex",gap:2,padding:3,borderRadius:7,background:c.surface2}} role="tablist">
@@ -933,7 +933,7 @@ function ConfigView({dark:dk,onToggle}) {
 
   return (
     <main style={{display:"flex",flexDirection:"column",gap:12}}>
-      <h1 style={{fontSize:15,fontWeight:500,color:c.text,margin:0,display:"flex",alignItems:"center",gap:8}}>
+      <h1 style={{fontSize:17,fontWeight:500,color:c.text,margin:0,display:"flex",alignItems:"center",gap:8}}>
         <Icon name="Gear" size={18} color={c.textMuted}/> Configuración
       </h1>
       <nav style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -964,17 +964,17 @@ function ConfigView({dark:dk,onToggle}) {
                 <div style={{fontSize:13,fontWeight:500,color:c.text}}>Backend</div>
                 <div style={{fontSize:11,color:c.textFaint}}>Notion</div>
               </div>
-              <span style={{fontSize:12,color:"#22C55E",fontWeight:500}}>● Conectado</span>
+              <span style={{fontSize:14,color:"#22C55E",fontWeight:500}}>● Conectado</span>
             </div>
           </>
         )}
 
         {section==="categories"&&(
           <>
-            <p style={{fontSize:12,color:c.textMuted,marginTop:0,marginBottom:12}}>Editá nombre e ícono de cada categoría.</p>
+            <p style={{fontSize:14,color:c.textMuted,marginTop:0,marginBottom:12}}>Editá nombre e ícono de cada categoría.</p>
             {editCat&&(
               <div style={{background:c.surface2,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,marginBottom:12}}>
-                <div style={{fontSize:12,fontWeight:500,color:c.text,marginBottom:8}}>Editando categoría</div>
+                <div style={{fontSize:14,fontWeight:500,color:c.text,marginBottom:8}}>Editando categoría</div>
                 <Fld label="Nombre" id="edit-cat-name">
                   <Inp id="edit-cat-name" value={editCat.name} onChange={e=>setEditCat(p=>({...p,name:e.target.value}))}/>
                 </Fld>
@@ -1005,7 +1005,7 @@ function ConfigView({dark:dk,onToggle}) {
 
         {section==="states"&&(
           <>
-            <p style={{fontSize:12,color:c.textMuted,marginTop:0,marginBottom:12}}>Estados disponibles globalmente.</p>
+            <p style={{fontSize:14,color:c.textMuted,marginTop:0,marginBottom:12}}>Estados disponibles globalmente.</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
               {estados.map((e,i)=>(
                 <div key={e} style={{display:"flex",alignItems:"center",gap:6,background:c.surface2,border:`1px solid ${c.border}`,borderRadius:7,padding:"4px 10px"}}>
@@ -1027,9 +1027,9 @@ function ConfigView({dark:dk,onToggle}) {
 
         {section==="trash"&&(
           <>
-            <p style={{fontSize:12,color:c.textMuted,marginTop:0,marginBottom:12}}>Tudús eliminados — podés restaurarlos o eliminarlos definitivamente.</p>
+            <p style={{fontSize:14,color:c.textMuted,marginTop:0,marginBottom:12}}>Tudús eliminados — podés restaurarlos o eliminarlos definitivamente.</p>
             <div style={{background:c.surface2,borderRadius:8,padding:12,border:`1px dashed ${c.border}`}}>
-              <p style={{fontSize:12,color:c.textFaint,textAlign:"center",margin:0}}>No hay tudús eliminados.</p>
+              <p style={{fontSize:14,color:c.textFaint,textAlign:"center",margin:0}}>No hay tudús eliminados.</p>
             </div>
           </>
         )}
@@ -1046,7 +1046,7 @@ function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
     const active=screen===id;
     return (
       <button type="button" onClick={()=>onNav(id)} aria-label={label}
-        style={{display:"flex",alignItems:"center",justifyContent:collapsed?"center":"flex-start",gap:6,width:"calc(100% - 8px)",padding:collapsed?"8px 0":`6px ${sub?28:10}px`,fontSize:12,cursor:"pointer",borderRadius:6,margin:"1px 4px",background:active?"rgba(117,176,228,0.12)":"transparent",color:active?BRAND:c.textMuted,fontWeight:active?500:400,border:"none",fontFamily:"inherit",textAlign:"left"}}>
+        style={{display:"flex",alignItems:"center",justifyContent:collapsed?"center":"flex-start",gap:6,width:"calc(100% - 8px)",padding:collapsed?"8px 0":`6px ${sub?28:10}px`,fontSize:14,cursor:"pointer",borderRadius:6,margin:"1px 4px",background:active?"rgba(117,176,228,0.12)":"transparent",color:active?BRAND:c.textMuted,fontWeight:active?500:400,border:"none",fontFamily:"inherit",textAlign:"left"}}>
         <Icon name={iconName} size={15} color={active?BRAND:c.textMuted}/>
         {!collapsed&&<>
           <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",color:active?BRAND:c.text}}>{label}</span>
@@ -1058,7 +1058,7 @@ function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
   return (
     <nav aria-label="Navegación principal" style={{width:collapsed?44:196,flexShrink:0,background:c.surface,borderRight:`1px solid ${c.border}`,display:"flex",flexDirection:"column",transition:"width .2s",overflow:"hidden"}}>
       <button type="button" aria-label={collapsed?"Expandir":"Colapsar"} onClick={onToggle}
-        style={{display:"flex",justifyContent:collapsed?"center":"flex-end",padding:"6px 10px",cursor:"pointer",color:c.textFaint,fontSize:14,height:36,alignItems:"center",background:"none",border:"none",borderBottom:`1px solid ${c.border}`,width:"100%"}}>
+        style={{display:"flex",justifyContent:collapsed?"center":"flex-end",padding:"8px 12px",cursor:"pointer",color:c.textFaint,fontSize:14,height:36,alignItems:"center",background:"none",border:"none",borderBottom:`1px solid ${c.border}`,width:"100%"}}>
         {collapsed?"›":"‹"}
       </button>
       <div style={{flex:1,overflowY:"auto",padding:"6px 0",display:"flex",flexDirection:"column"}}>
@@ -1068,7 +1068,7 @@ function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
         {!collapsed&&<div style={{fontSize:10,textTransform:"uppercase",letterSpacing:".5px",color:c.textFaint,padding:"8px 14px 2px"}}>Categorías</div>}
         {!collapsed&&(
           <button type="button" onClick={()=>setCatsOpen(o=>!o)} aria-expanded={catsOpen}
-            style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",fontSize:12,cursor:"pointer",color:c.textMuted,borderRadius:6,margin:"1px 4px",background:"none",border:"none",fontFamily:"inherit",textAlign:"left",width:"calc(100% - 8px)"}}>
+            style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",fontSize:14,cursor:"pointer",color:c.textMuted,borderRadius:6,margin:"1px 4px",background:"none",border:"none",fontFamily:"inherit",textAlign:"left",width:"calc(100% - 8px)"}}>
             <span>{catsOpen?"▾":"▸"}</span><span style={{color:c.text}}>Categorías</span>
           </button>
         )}
@@ -1127,7 +1127,7 @@ export default function App() {
         <button type="button" aria-label="Inicio" onClick={()=>setScreen("dashboard")} style={{cursor:"pointer",display:"flex",alignItems:"center",flexShrink:0,background:"none",border:"none",padding:0}}>
           <img src="https://i.imgur.com/aSpAvYD.png" style={{height:22,width:"auto"}} alt="tudús"
             onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
-          <span style={{display:"none",fontSize:15,fontWeight:600,color:c.text}}>tudús</span>
+          <span style={{display:"none",fontSize:17,fontWeight:600,color:c.text}}>tudús</span>
         </button>
 
         <div role="search" style={{flex:1,display:"flex",justifyContent:"center",padding:"0 10px"}}>
@@ -1137,11 +1137,11 @@ export default function App() {
               <circle cx="6.5" cy="6.5" r="5" stroke="#9CA3AF" strokeWidth="1.5"/>
               <path d="M10.5 10.5L14 14" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            {!searchExp&&<span style={{fontSize:12,color:c.textFaint}}>Buscar</span>}
+            {!searchExp&&<span style={{fontSize:14,color:c.textFaint}}>Buscar</span>}
             {searchExp&&<>
               <label htmlFor="search-input" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"}}>Buscar</label>
               <input id="search-input" autoFocus onBlur={()=>setSearchExp(false)}
-                style={{flex:1,fontSize:12,border:"none",background:"transparent",outline:"none",color:c.text,minWidth:0}}
+                style={{flex:1,fontSize:14,border:"none",background:"transparent",outline:"none",color:c.text,minWidth:0}}
                 placeholder="Buscar tudús..."/>
               <select onMouseDown={e=>e.stopPropagation()}
                 style={{fontSize:11,border:"none",background:"transparent",outline:"none",color:c.textFaint,cursor:"pointer",flexShrink:0}}>
