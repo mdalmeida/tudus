@@ -1,11 +1,15 @@
-const TOKEN = import.meta.env.VITE_NOTION_TOKEN;
 const DB = "328d85fa113d8103898cd86ec5db2feb";
-const API = "https://api.notion.com/v1";
-const H = {
-  "Authorization": `Bearer ${TOKEN}`,
-  "Notion-Version": "2022-06-28",
-  "Content-Type": "application/json",
-};
+
+async function notionFetch(endpoint: string, method = "POST", body?: any) {
+  const res = await fetch("/api/notion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint, method, body }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.error || "Error de API");
+  return data;
+}
 
 export type Tudu = {
   id: string;
@@ -77,11 +81,7 @@ export async function getTudus(): Promise<Tudu[]> {
   do {
     const body: any = { filter: { property: "Eliminado", checkbox: { equals: false } } };
     if (cursor) body.start_cursor = cursor;
-    const res = await fetch(`${API}/databases/${DB}/query`, {
-      method: "POST", headers: H, body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Error al leer tudús");
+    const data = await notionFetch(`/databases/${DB}/query`, "POST", body);
     pages.push(...data.results);
     cursor = data.has_more ? data.next_cursor : undefined;
   } while (cursor);
@@ -89,22 +89,17 @@ export async function getTudus(): Promise<Tudu[]> {
 }
 
 export async function createTudu(data: Partial<Omit<Tudu, "id">>): Promise<Tudu> {
-  const res = await fetch(`${API}/pages`, {
-    method: "POST", headers: H,
-    body: JSON.stringify({ parent: { database_id: DB }, properties: buildProps(data) }),
+  const page = await notionFetch("/pages", "POST", {
+    parent: { database_id: DB },
+    properties: buildProps(data),
   });
-  const page = await res.json();
-  if (!res.ok) throw new Error(page.message || "Error al crear tudú");
   return parsePage(page);
 }
 
 export async function updateTudu(id: string, data: Partial<Omit<Tudu, "id">>): Promise<Tudu> {
-  const res = await fetch(`${API}/pages/${id}`, {
-    method: "PATCH", headers: H,
-    body: JSON.stringify({ properties: buildProps(data) }),
+  const page = await notionFetch(`/pages/${id}`, "PATCH", {
+    properties: buildProps(data),
   });
-  const page = await res.json();
-  if (!res.ok) throw new Error(page.message || "Error al actualizar tudú");
   return parsePage(page);
 }
 
