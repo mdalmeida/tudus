@@ -1,5 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
+import { getTudus, type Tudu } from "./notion";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
@@ -44,16 +45,14 @@ const SBADGE = {
   "No lo haré":{bg:"#F3F4F6",tx:"#6B7280"},
 };
 
-const POOL_INIT = [
-  {id:1,type:"📋 Tarea",   title:"Arreglar canilla",    cat:"House & Car",c:PCOLORS[0]},
-  {id:2,type:"💡 Idea",    title:"Leer sobre hábitos",  cat:"Skills",     c:PCOLORS[1]},
-  {id:3,type:"📊 Analizar",title:"Revisar inversiones",  cat:"Financial",  c:PCOLORS[2]},
-  {id:4,type:"📋 Tarea",   title:"Meditación matutina", cat:"Health",     c:PCOLORS[3]},
-  {id:5,type:"💬 WhatsApp",title:"Llamar a mamá",        cat:"Family",     c:PCOLORS[4]},
-  {id:6,type:"📊 Analizar",title:"Presupuesto Q2",       cat:"My Work",    c:PCOLORS[5]},
-  {id:7,type:"📋 Tarea",   title:"Turno dentista",      cat:"Health",     c:PCOLORS[0]},
-  {id:8,type:"🛒 Compra",  title:"Renovar seguro auto", cat:"House & Car",c:PCOLORS[6]},
-];
+const TIPO_EMOJI: Record<string,string> = {
+  "Tarea":"📋","Idea":"💡","WhatsApp":"💬","Mail":"✉","Teams":"👥","Compra":"🛒",
+  "Llamada":"📞","Decisión":"🎯","Hábito":"🔁","Aprender":"📚","Reflexionar":"💭",
+  "Investigar":"🔎","Ejercicio":"💪","Redactar":"✍","Analizar":"📊",
+};
+function tuduToPool(t: Tudu, i: number) {
+  return { id:t.id, type:`${TIPO_EMOJI[t.tipo]||"📋"} ${t.tipo}`, title:t.title, cat:t.categoria, c:PCOLORS[i % PCOLORS.length] };
+}
 
 const KANBAN_INIT = {
   "Por hacer":[{id:10,type:"🔎 Investigar",title:"Auditoría procesos",date:"Este mes",lc:"#93C5FD"},{id:11,type:"✉ Mail",title:"Responder propuestas",date:"Mañana",lc:"#93C5FD"}],
@@ -519,11 +518,19 @@ function PomoWidget({onClose,onOpenTask,isMobile,dark:dk}) {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
   const c = th(dk||false);
-  const [pool,setPool]       = useState(POOL_INIT);
+  const [pool,setPool]       = useState<any[]>([]);
+  const [loading,setLoading] = useState(true);
   const [dragId,setDragId]   = useState(null);
   const [overSlot,setOverSlot] = useState(null);
   const slotRefs = useRef({});
   const {show,Toast} = useToast();
+
+  useEffect(()=>{
+    getTudus()
+      .then(tudus => setPool(tudus.filter(t=>t.cuando==="Sin fecha"||!t.cuando).map(tuduToPool)))
+      .catch(err => { console.error("Error cargando tudús:",err); show("Error al cargar tudús"); })
+      .finally(()=>setLoading(false));
+  },[]);
   const SLOTS = ["Hoy","Mañana / Pasado","Esta semana","Próxima semana"];
 
   const flyTo=(cx,cy,slotEl,color)=>{
@@ -579,7 +586,8 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
           );
         })}
       </div>
-      {pool.length>0&&(
+      {loading&&<p style={{fontSize:14,color:c.textFaint,textAlign:"center",padding:20}}>Cargando tudús...</p>}
+      {!loading&&pool.length>0&&(
         <section style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:12,padding:12}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
             <h2 style={{fontSize:14,fontWeight:500,color:c.text,margin:0}}>Vencidos / Sin planificar</h2>
