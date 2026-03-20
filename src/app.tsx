@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
-import { getTudus, createTudu, type Tudu } from "./notion";
+import { getTudus, createTudu, updateTudu, deleteTudu, type Tudu } from "./notion";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
@@ -51,8 +51,10 @@ const TIPO_EMOJI: Record<string,string> = {
   "Investigar":"🔎","Ejercicio":"💪","Redactar":"✍","Analizar":"📊",
 };
 function tuduToPool(t: Tudu, i: number) {
-  return { id:t.id, type:`${TIPO_EMOJI[t.tipo]||"📋"} ${t.tipo}`, title:t.title, cat:t.categoria, c:PCOLORS[i % PCOLORS.length] };
+  return { id:t.id, type:`${TIPO_EMOJI[t.tipo]||"📋"} ${t.tipo}`, title:t.title, cat:t.categoria, c:PCOLORS[i % PCOLORS.length], cuando:t.cuando, estado:t.estado };
 }
+const SLOT_TO_CUANDO: Record<string,string> = {"Hoy":"Hoy","Mañana / Pasado":"Mañana","Esta semana":"Esta semana","Próxima semana":"Próxima semana"};
+const CUANDO_TO_SLOT: Record<string,string> = {"Hoy":"Hoy","Mañana":"Mañana / Pasado","Esta semana":"Esta semana","Próxima semana":"Próxima semana"};
 
 const KANBAN_INIT = {
   "Por hacer":[{id:10,type:"🔎 Investigar",title:"Auditoría procesos",date:"Este mes",lc:"#93C5FD"},{id:11,type:"✉ Mail",title:"Responder propuestas",date:"Mañana",lc:"#93C5FD"}],
@@ -238,14 +240,18 @@ function WysiwygEditor({placeholder,id}) {
 }
 
 // ── TuduForm ──────────────────────────────────────────────────────────────────
-function TuduForm({title,action,onClose,onCreated,dark:dk}) {
-  const [nombre,setNombre]     = useState("");
-  const [tipo,setTipo]         = useState(TUDU_TYPES[0]);
-  const [cat,setCat]           = useState(CATEGORIAS_NAMES[0]);
-  const [estado,setEstado]     = useState(ESTADOS_DEFAULT[0]);
-  const [cuando,setCuando]     = useState("Sin fecha");
-  const [deadline,setDeadline] = useState("");
-  const [selColor,setSelColor] = useState(0);
+function TuduForm({title,action,onClose,onCreated,editTudu,dark:dk}) {
+  const et = editTudu;
+  const matchTipo = et?.tipo ? TUDU_TYPES.find(t=>t.includes(et.tipo))||TUDU_TYPES[0] : TUDU_TYPES[0];
+  const matchColor = et?.color ? PCOLORS.findIndex(p=>p.bg===et.color) : 0;
+  const matchSize = et?.tamano ? ["XS","S","M","L","XL"].indexOf(et.tamano) : 2;
+  const [nombre,setNombre]     = useState(et?.title||"");
+  const [tipo,setTipo]         = useState(matchTipo);
+  const [cat,setCat]           = useState(et?.categoria||CATEGORIAS_NAMES[0]);
+  const [estado,setEstado]     = useState(et?.estado||ESTADOS_DEFAULT[0]);
+  const [cuando,setCuando]     = useState(et?.cuando||"Sin fecha");
+  const [deadline,setDeadline] = useState(et?.deadline||"");
+  const [selColor,setSelColor] = useState(matchColor>=0?matchColor:0);
   const [selSize,setSelSize]   = useState(2);
   const [selIcon,setSelIcon]   = useState("CheckSquare");
   const [tags,setTags]         = useState("");
@@ -259,7 +265,7 @@ function TuduForm({title,action,onClose,onCreated,dark:dk}) {
     setSaving(true);
     try {
       const tipoClean = tipo.replace(/^.+\s/,"");
-      await createTudu({
+      const data = {
         title: nombre.trim(),
         tipo: tipoClean,
         categoria: cat,
@@ -270,11 +276,13 @@ function TuduForm({title,action,onClose,onCreated,dark:dk}) {
         tamano: SIZES[selSize],
         etiquetas: tags.split(",").map(t=>t.trim()).filter(Boolean),
         contenido: "",
-      });
+      };
+      if(et?.id) await updateTudu(et.id, data);
+      else await createTudu(data);
       onCreated?.();
       onClose();
     } catch (err) {
-      console.error("Error creando tudú:", err);
+      console.error("Error guardando tudú:", err);
       setSaving(false);
     }
   };
@@ -331,15 +339,27 @@ function TuduForm({title,action,onClose,onCreated,dark:dk}) {
 }
 
 // ── TuduDetail ────────────────────────────────────────────────────────────────
-function TuduDetail({onClose,onPomo,dark:dk}) {
+function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
   const c = th(dk||false);
   const [editing,setEditing]   = useState(false);
-  const [status,setStatus]     = useState("En curso");
+  const [status,setStatus]     = useState(tudu?.estado||"Por hacer");
+  const [deleting,setDeleting] = useState(false);
   const [subtasks,setSubtasks] = useState([{id:1,title:"Preparar agenda",done:false},{id:2,title:"Confirmar asistentes",done:true}]);
   const [newSub,setNewSub]     = useState("");
   const titleId = "modal-tudu-detail";
+  const emoji = TIPO_EMOJI[tudu?.tipo]||"📋";
 
-  if(editing) return <TuduForm title="Editar Tudú" action="Guardar" onClose={()=>setEditing(false)} dark={dk}/>;
+  if(editing) return <TuduForm title="Editar Tudú" action="Guardar" editTudu={tudu} onClose={()=>setEditing(false)} onCreated={()=>{onSaved?.();setEditing(false);}} dark={dk}/>;
+
+  const handleStatusChange=async(newStatus)=>{
+    setStatus(newStatus);
+    try{ await updateTudu(tudu.id,{estado:newStatus}); onSaved?.(); }catch(err){ console.error(err); }
+  };
+
+  const handleDelete=async()=>{
+    setDeleting(true);
+    try{ await deleteTudu(tudu.id); onSaved?.(); onClose(); }catch(err){ console.error(err); setDeleting(false); }
+  };
 
   const addSub = ()=>{
     if(!newSub.trim()) return;
@@ -349,26 +369,24 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
 
   return (
     <Overlay onClose={onClose} dark={dk} titleId={titleId}>
-      {/* header — no edit button here */}
       <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:12}}>
-        <span style={{fontSize:18}}>📋</span>
+        <span style={{fontSize:18}}>{emoji}</span>
         <div style={{flex:1}}>
-          <h2 id={titleId} style={{fontSize:14,fontWeight:500,color:c.text,margin:0}}>Reunión con equipo</h2>
-          <div style={{fontSize:13,color:c.textFaint,marginTop:2}}>My Work · Tarea</div>
+          <h2 id={titleId} style={{fontSize:14,fontWeight:500,color:c.text,margin:0}}>{tudu?.title||"Sin título"}</h2>
+          <div style={{fontSize:13,color:c.textFaint,marginTop:2}}>{tudu?.categoria} · {tudu?.tipo}</div>
         </div>
         <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:c.textFaint}}>✕</button>
       </div>
 
-      {/* props grid */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:12}}>
         <div style={{background:c.surface2,borderRadius:8,padding:"7px 10px",border:`1px solid ${c.border}`}}>
           <label htmlFor="det-status" style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3,display:"block"}}>Estado</label>
-          <select id="det-status" value={status} onChange={e=>setStatus(e.target.value)}
+          <select id="det-status" value={status} onChange={e=>handleStatusChange(e.target.value)}
             style={{border:"none",background:"transparent",padding:0,fontSize:14,color:c.text,cursor:"pointer",width:"100%",outline:"none"}}>
             {ESTADOS_DEFAULT.map(s=><option key={s}>{s}</option>)}
           </select>
         </div>
-        {[["Fecha","Hoy — 14 mar"],["Tipo","📋 Tarea"],["Pomodoros","2 · 45 min"]].map(([l,v])=>(
+        {[["Cuándo",tudu?.cuando||"Sin fecha"],["Tipo",`${emoji} ${tudu?.tipo}`],["Tamaño",tudu?.tamano||"M"]].map(([l,v])=>(
           <div key={l} style={{background:c.surface2,borderRadius:8,padding:"7px 10px",border:`1px solid ${c.border}`}}>
             <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>{l}</div>
             <div style={{fontSize:14,color:c.text}}>{v}</div>
@@ -376,13 +394,12 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
         ))}
       </div>
 
-      {/* content */}
-      <div style={{background:c.surface2,borderRadius:8,padding:12,marginBottom:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`}}>
-        <strong style={{color:c.text}}>Agenda de la reunión</strong><br/><br/>
-        • Revisar avances del sprint<br/>• Definir prioridades<br/>• Bloqueantes del equipo
-      </div>
+      {tudu?.contenido&&(
+        <div style={{background:c.surface2,borderRadius:8,padding:12,marginBottom:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`}}>
+          {tudu.contenido}
+        </div>
+      )}
 
-      {/* subtasks */}
       <div style={{marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:500,color:c.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:".4px"}}>Subtareas</div>
         {subtasks.length>0&&(
@@ -408,7 +425,6 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
         </div>
       </div>
 
-      {/* pomo */}
       <button type="button" onClick={()=>{onClose();onPomo();}}
         style={{display:"flex",alignItems:"center",gap:8,background:c.surface2,borderRadius:8,padding:"8px 12px",cursor:"pointer",border:`1px solid ${c.border}`,width:"100%",textAlign:"left",marginBottom:10,fontFamily:"inherit"}}>
         <div style={{width:28,height:28,borderRadius:"50%",background:"#FEE2E2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>⏱</div>
@@ -419,8 +435,13 @@ function TuduDetail({onClose,onPomo,dark:dk}) {
         <span style={{color:c.border}}>›</span>
       </button>
 
-      {/* single edit button at bottom */}
-      <Btn onClick={()=>setEditing(true)} style={{width:"100%"}}>✎ Editar Tudú completo</Btn>
+      <div style={{display:"flex",gap:8}}>
+        <Btn onClick={()=>setEditing(true)} style={{flex:1}}>✎ Editar Tudú completo</Btn>
+        <button type="button" onClick={handleDelete} disabled={deleting}
+          style={{padding:"8px 16px",borderRadius:8,border:"1px solid #FCA5A5",background:"transparent",color:"#DC2626",cursor:"pointer",fontSize:14,fontFamily:"inherit",opacity:deleting?0.5:1}}>
+          {deleting?"Eliminando...":"🗑 Eliminar"}
+        </button>
+      </div>
     </Overlay>
   );
 }
@@ -550,22 +571,29 @@ function PomoWidget({onClose,onOpenTask,isMobile,dark:dk}) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
+function Dashboard({onNew,onTudu,onRefresh,dark:dk,isMobile}) {
   const c = th(dk||false);
-  const [pool,setPool]       = useState<any[]>([]);
-  const [loading,setLoading] = useState(true);
-  const [dragId,setDragId]   = useState(null);
+  const [allTudus,setAllTudus] = useState<any[]>([]);
+  const [loading,setLoading]   = useState(true);
+  const [dragId,setDragId]     = useState(null);
   const [overSlot,setOverSlot] = useState(null);
+  const [quickVal,setQuickVal] = useState("");
+  const [quickSaving,setQuickSaving] = useState(false);
   const slotRefs = useRef({});
   const {show,Toast} = useToast();
 
-  useEffect(()=>{
+  const reload = ()=>{
+    setLoading(true);
     getTudus()
-      .then(tudus => setPool(tudus.filter(t=>t.cuando==="Sin fecha"||!t.cuando).map(tuduToPool)))
+      .then(tudus => setAllTudus(tudus.map(tuduToPool)))
       .catch(err => { console.error("Error cargando tudús:",err); show("Error al cargar tudús"); })
       .finally(()=>setLoading(false));
-  },[]);
+  };
+  useEffect(reload,[]);
+
   const SLOTS = ["Hoy","Mañana / Pasado","Esta semana","Próxima semana"];
+  const pool = allTudus.filter(t=>!t.cuando||t.cuando==="Sin fecha"||t.cuando==="Algún día");
+  const slotItems = (slot: string) => allTudus.filter(t=>CUANDO_TO_SLOT[t.cuando]===slot);
 
   const flyTo=(cx,cy,slotEl,color)=>{
     if(!slotEl) return;
@@ -580,14 +608,42 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
     setTimeout(()=>g.remove(),420);
   };
 
-  const handleDrop=(slot,e)=>{
+  const handleDrop=async(slot,e)=>{
     if(!dragId) return;
-    const item=pool.find(p=>p.id===dragId);
+    const item=allTudus.find(p=>p.id===dragId);
     flyTo(e.clientX,e.clientY,slotRefs.current[slot],item?.c?.bg||"#FEF08A");
-    setPool(p=>p.filter(p2=>p2.id!==dragId));
     setDragId(null);setOverSlot(null);
-    show("Asignado a: "+slot);
+    const cuando = SLOT_TO_CUANDO[slot];
+    if(cuando){
+      setAllTudus(p=>p.map(t=>t.id===dragId?{...t,cuando}:t));
+      show("Asignado a: "+slot);
+      try{ await updateTudu(dragId,{cuando}); }catch(err){ console.error(err); show("Error al mover"); reload(); }
+    }
   };
+
+  const handleQuickCreate=async()=>{
+    if(!quickVal.trim()||quickSaving) return;
+    setQuickSaving(true);
+    try{
+      await createTudu({title:quickVal.trim(),categoria:"Inbox",estado:"Por hacer",cuando:"Sin fecha"});
+      setQuickVal("");
+      show("Tudú creado en Inbox");
+      reload();
+    }catch(err){ console.error(err); show("Error al crear"); }
+    finally{ setQuickSaving(false); }
+  };
+
+  const TuduChip=({item})=>(
+    <div draggable
+      onDragStart={e=>{setDragId(item.id);e.dataTransfer.setData("text/plain",String(item.id));}}
+      onDragEnd={()=>setDragId(null)}
+      onClick={()=>onTudu(item)}
+      style={{background:item.c.bg,color:item.c.tx,borderRadius:8,padding:"6px 9px",fontSize:13,cursor:"grab",minWidth:80,maxWidth:140,userSelect:"none",opacity:dragId===item.id?0.3:1,boxShadow:"1px 2px 6px rgba(0,0,0,0.12)",transition:"opacity .15s"}}>
+      <div style={{fontSize:11,opacity:.7,marginBottom:1}}>{item.type}</div>
+      <div style={{fontWeight:500,lineHeight:1.3}}>{item.title}</div>
+      <div style={{fontSize:11,opacity:.6,marginTop:2}}>{item.cat}</div>
+    </div>
+  );
 
   return (
     <main style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -598,14 +654,17 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
       <div style={{display:"flex",gap:8}}>
         <label htmlFor="quick-create" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"}}>Crear tudú rápido</label>
         <input id="quick-create" style={{flex:1,padding:"6px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:8,outline:"none",fontFamily:"inherit",background:c.surface,color:c.text}}
-          placeholder="Nuevo tudú rápido... (Enter)"
-          onKeyDown={e=>{if(e.key==="Enter"&&e.target.value.trim()){show("Tudú creado en Inbox");e.target.value="";}}}/>
+          placeholder={quickSaving?"Guardando...":"Nuevo tudú rápido... (Enter)"}
+          value={quickVal} onChange={e=>setQuickVal(e.target.value)}
+          disabled={quickSaving}
+          onKeyDown={e=>{if(e.key==="Enter")handleQuickCreate();}}/>
         <Btn onClick={onNew}>+ Nuevo</Btn>
       </div>
       <p style={{fontSize:13,color:c.textFaint,fontWeight:500,margin:0}}>Arrastrá tudús hacia las cajitas para planificar</p>
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:8}}>
         {SLOTS.map(slot=>{
           const over=overSlot===slot;
+          const items=slotItems(slot);
           return (
             <div key={slot} ref={el=>slotRefs.current[slot]=el}
               style={{border:over?`2px solid ${BRAND}`:`2px dashed ${c.border2}`,borderRadius:12,padding:8,minHeight:64,
@@ -614,8 +673,11 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
               onDragOver={e=>{e.preventDefault();setOverSlot(slot);}}
               onDragLeave={()=>setOverSlot(null)}
               onDrop={e=>handleDrop(slot,e)}>
-              <div style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:".5px",color:over?BRAND:c.textFaint,marginBottom:4}}>{slot}</div>
-              <div style={{fontSize:13,color:over?BRAND:c.border2,textAlign:"center",paddingTop:6}}>{over?"¡Soltá acá!":"Soltá acá"}</div>
+              <div style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:".5px",color:over?BRAND:c.textFaint,marginBottom:4}}>{slot}{items.length>0&&` (${items.length})`}</div>
+              {items.length>0
+                ? <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{items.map(item=><TuduChip key={item.id} item={item}/>)}</div>
+                : <div style={{fontSize:13,color:over?BRAND:c.border2,textAlign:"center",paddingTop:6}}>{over?"¡Soltá acá!":"Soltá acá"}</div>
+              }
             </div>
           );
         })}
@@ -628,16 +690,7 @@ function Dashboard({onNew,onTudu,dark:dk,isMobile}) {
             <span style={{fontSize:11,padding:"2px 8px",borderRadius:12,background:"#FEE2E2",color:"#DC2626"}}>{pool.length} pendientes</span>
           </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {pool.map(item=>(
-              <div key={item.id} draggable
-                onDragStart={e=>{setDragId(item.id);e.dataTransfer.setData("text/plain",String(item.id));}}
-                onDragEnd={()=>setDragId(null)}
-                style={{background:item.c.bg,color:item.c.tx,borderRadius:8,padding:"6px 9px",fontSize:13,cursor:"grab",minWidth:80,maxWidth:140,userSelect:"none",opacity:dragId===item.id?0.3:1,boxShadow:"1px 2px 6px rgba(0,0,0,0.12)",transition:"opacity .15s"}}>
-                <div style={{fontSize:11,opacity:.7,marginBottom:1}}>{item.type}</div>
-                <div style={{fontWeight:500,lineHeight:1.3}}>{item.title}</div>
-                <div style={{fontSize:11,opacity:.6,marginTop:2}}>{item.cat}</div>
-              </div>
-            ))}
+            {pool.map(item=><TuduChip key={item.id} item={item}/>)}
           </div>
         </section>
       )}
@@ -1150,6 +1203,7 @@ export default function App() {
   const [collapsed,setCollapsed] = useState(false);
   const [showNew,setShowNew]     = useState(false);
   const [showTudu,setShowTudu]   = useState(false);
+  const [selectedTudu,setSelectedTudu] = useState<any>(null);
   const [showPomo,setShowPomo]   = useState(false);
   const [refreshKey,setRefreshKey] = useState(0);
   const [searchExp,setSearchExp] = useState(false);
@@ -1207,7 +1261,7 @@ export default function App() {
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         {!isMobile&&<Sidebar screen={screen} onNav={setScreen} collapsed={collapsed} onToggle={()=>setCollapsed(s=>!s)} dark={dark} cats={cats}/>}
         <div style={{flex:1,overflowY:"auto",padding:isMobile?"12px":"16px",paddingBottom:isMobile?72:16,background:c.bg}}>
-          {screen==="dashboard" && <Dashboard key={refreshKey} onNew={()=>setShowNew(true)} onTudu={()=>setShowTudu(true)} dark={dark} isMobile={isMobile}/>}
+          {screen==="dashboard" && <Dashboard key={refreshKey} onNew={()=>setShowNew(true)} onTudu={(t)=>{setSelectedTudu(t);setShowTudu(true);}} onRefresh={()=>setRefreshKey(k=>k+1)} dark={dark} isMobile={isMobile}/>}
           {screen==="all"       && <ListView title="Todos los tudús" onTudu={()=>setShowTudu(true)} dark={dark}/>}
           {screen==="inbox"     && <ListView title="Inbox" onTudu={()=>setShowTudu(true)} dark={dark}/>}
           {screen==="category"  && <CategoryView onView={()=>setScreen("canvas")} onTudu={()=>setShowTudu(true)}/>}
@@ -1227,7 +1281,7 @@ export default function App() {
       </button>
 
       {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} onCreated={()=>setRefreshKey(k=>k+1)} dark={dark}/>}
-      {showTudu && <TuduDetail onClose={()=>setShowTudu(false)} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} dark={dark}/>}
+      {showTudu && <TuduDetail tudu={selectedTudu} onClose={()=>{setShowTudu(false);setSelectedTudu(null);}} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} onSaved={()=>setRefreshKey(k=>k+1)} dark={dark}/>}
       {showPomo && <PomoWidget onClose={()=>setShowPomo(false)} onOpenTask={()=>setShowTudu(true)} isMobile={isMobile} dark={dark}/>}
     </div>
   );
