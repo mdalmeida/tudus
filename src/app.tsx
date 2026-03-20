@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
-import { getTudus, type Tudu } from "./notion";
+import { getTudus, createTudu, type Tudu } from "./notion";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
@@ -238,33 +238,67 @@ function WysiwygEditor({placeholder,id}) {
 }
 
 // ── TuduForm ──────────────────────────────────────────────────────────────────
-function TuduForm({title,action,onClose,dark:dk}) {
+function TuduForm({title,action,onClose,onCreated,dark:dk}) {
+  const [nombre,setNombre]     = useState("");
+  const [tipo,setTipo]         = useState(TUDU_TYPES[0]);
+  const [cat,setCat]           = useState(CATEGORIAS_NAMES[0]);
+  const [estado,setEstado]     = useState(ESTADOS_DEFAULT[0]);
+  const [cuando,setCuando]     = useState("Sin fecha");
+  const [deadline,setDeadline] = useState("");
   const [selColor,setSelColor] = useState(0);
   const [selSize,setSelSize]   = useState(2);
   const [selIcon,setSelIcon]   = useState("CheckSquare");
-  const [cuando,setCuando]     = useState("Sin fecha");
+  const [tags,setTags]         = useState("");
+  const [saving,setSaving]     = useState(false);
   const dateHint = calcDate(cuando);
   const titleId = "form-title-"+action;
+  const SIZES = ["XS","S","M","L","XL"];
+
+  const handleSubmit = async () => {
+    if (!nombre.trim()) return;
+    setSaving(true);
+    try {
+      const tipoClean = tipo.replace(/^.+\s/,"");
+      await createTudu({
+        title: nombre.trim(),
+        tipo: tipoClean,
+        categoria: cat,
+        estado,
+        cuando,
+        deadline: deadline || null,
+        color: PCOLORS[selColor].bg,
+        tamano: SIZES[selSize],
+        etiquetas: tags.split(",").map(t=>t.trim()).filter(Boolean),
+        contenido: "",
+      });
+      onCreated?.();
+      onClose();
+    } catch (err) {
+      console.error("Error creando tudú:", err);
+      setSaving(false);
+    }
+  };
+
   return (
     <Overlay onClose={onClose} dark={dk} titleId={titleId}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <h2 id={titleId} style={{fontSize:14,fontWeight:500,margin:0}}>{title}</h2>
         <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:"#9CA3AF"}}>✕</button>
       </div>
-      <Fld label="Título" id="f-title"><Inp id="f-title" dark={dk} placeholder="¿Qué tenés que hacer?" autoFocus/></Fld>
+      <Fld label="Título" id="f-title"><Inp id="f-title" dark={dk} placeholder="¿Qué tenés que hacer?" autoFocus value={nombre} onChange={e=>setNombre(e.target.value)}/></Fld>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk}>{TUDU_TYPES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
-        <Fld label="Categoría" id="f-cat"><Sel id="f-cat" dark={dk}>{CATEGORIAS_NAMES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk} value={tipo} onChange={e=>setTipo(e.target.value)}>{TUDU_TYPES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Categoría" id="f-cat"><Sel id="f-cat" dark={dk} value={cat} onChange={e=>setCat(e.target.value)}>{CATEGORIAS_NAMES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Estado" id="f-estado"><Sel id="f-estado" dark={dk}>{ESTADOS_DEFAULT.filter(v=>v!=="Terminando").map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Estado" id="f-estado"><Sel id="f-estado" dark={dk} value={estado} onChange={e=>setEstado(e.target.value)}>{ESTADOS_DEFAULT.filter(v=>v!=="Terminando").map(v=><option key={v}>{v}</option>)}</Sel></Fld>
         <Fld label="Cuándo" id="f-cuando">
           <Sel id="f-cuando" dark={dk} value={cuando} onChange={e=>setCuando(e.target.value)}>{CUANDO.map(v=><option key={v}>{v}</option>)}</Sel>
           {dateHint&&<div style={{fontSize:11,color:BRAND,marginTop:3}}>→ {dateHint}</div>}
         </Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Deadline" id="f-dl"><Inp id="f-dl" dark={dk} type="date"/></Fld>
+        <Fld label="Deadline" id="f-dl"><Inp id="f-dl" dark={dk} type="date" value={deadline} onChange={e=>setDeadline(e.target.value)}/></Fld>
         <Fld label="Tudú padre" id="f-padre"><Sel id="f-padre" dark={dk}><option>— Ninguno —</option><option>Proyecto Alpha</option></Sel></Fld>
       </div>
       <Fld label="Ícono" id="f-icon"><IconPicker value={selIcon} onChange={setSelIcon}/></Fld>
@@ -279,18 +313,18 @@ function TuduForm({title,action,onClose,dark:dk}) {
       </Fld>
       <Fld label="Tamaño" id="f-size">
         <div style={{display:"flex",gap:6}}>
-          {["XS","S","M","L","XL"].map((sz,i)=>(
+          {SIZES.map((sz,i)=>(
             <button key={sz} type="button" onClick={()=>setSelSize(i)}
               style={{fontSize:13,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid",
                 background:selSize===i?BRAND:"transparent",color:selSize===i?"#fff":"#9CA3AF",borderColor:selSize===i?BRAND:"#E5E7EB"}}>{sz}</button>
           ))}
         </div>
       </Fld>
-      <Fld label="Etiquetas" id="f-tags"><Inp id="f-tags" dark={dk} placeholder="trabajo, urgente... (coma)"/></Fld>
+      <Fld label="Etiquetas" id="f-tags"><Inp id="f-tags" dark={dk} placeholder="trabajo, urgente... (coma)" value={tags} onChange={e=>setTags(e.target.value)}/></Fld>
       <Fld label="Contenido" id="f-content"><WysiwygEditor id="f-content" placeholder="Escribí acá..."/></Fld>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
         <Btn ghost onClick={onClose}>Cancelar</Btn>
-        <Btn onClick={onClose}>{action}</Btn>
+        <Btn onClick={handleSubmit}>{saving ? "Guardando..." : action}</Btn>
       </div>
     </Overlay>
   );
@@ -1117,6 +1151,7 @@ export default function App() {
   const [showNew,setShowNew]     = useState(false);
   const [showTudu,setShowTudu]   = useState(false);
   const [showPomo,setShowPomo]   = useState(false);
+  const [refreshKey,setRefreshKey] = useState(0);
   const [searchExp,setSearchExp] = useState(false);
   const [cats]                   = useState(CATS_INIT);
   const isMobile                 = useIsMobile();
@@ -1172,7 +1207,7 @@ export default function App() {
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         {!isMobile&&<Sidebar screen={screen} onNav={setScreen} collapsed={collapsed} onToggle={()=>setCollapsed(s=>!s)} dark={dark} cats={cats}/>}
         <div style={{flex:1,overflowY:"auto",padding:isMobile?"12px":"16px",paddingBottom:isMobile?72:16,background:c.bg}}>
-          {screen==="dashboard" && <Dashboard onNew={()=>setShowNew(true)} onTudu={()=>setShowTudu(true)} dark={dark} isMobile={isMobile}/>}
+          {screen==="dashboard" && <Dashboard key={refreshKey} onNew={()=>setShowNew(true)} onTudu={()=>setShowTudu(true)} dark={dark} isMobile={isMobile}/>}
           {screen==="all"       && <ListView title="Todos los tudús" onTudu={()=>setShowTudu(true)} dark={dark}/>}
           {screen==="inbox"     && <ListView title="Inbox" onTudu={()=>setShowTudu(true)} dark={dark}/>}
           {screen==="category"  && <CategoryView onView={()=>setScreen("canvas")} onTudu={()=>setShowTudu(true)}/>}
@@ -1191,7 +1226,7 @@ export default function App() {
         <span style={{display:"none",color:"#fff",fontSize:22,fontWeight:300}}>+</span>
       </button>
 
-      {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} dark={dark}/>}
+      {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} onCreated={()=>setRefreshKey(k=>k+1)} dark={dark}/>}
       {showTudu && <TuduDetail onClose={()=>setShowTudu(false)} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} dark={dark}/>}
       {showPomo && <PomoWidget onClose={()=>setShowPomo(false)} onOpenTask={()=>setShowTudu(true)} isMobile={isMobile} dark={dark}/>}
     </div>
