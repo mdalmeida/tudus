@@ -1,7 +1,7 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
 import { getTudus, createTudu, updateTudu, deleteTudu, type Tudu } from "./notion";
-import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray } from "@phosphor-icons/react";
+import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray, ArrowsClockwise } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
 
@@ -383,7 +383,7 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
           <label htmlFor="det-status" style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3,display:"block"}}>Estado</label>
           <select id="det-status" value={status} onChange={e=>handleStatusChange(e.target.value)}
             style={{border:"none",background:"transparent",padding:0,fontSize:14,color:c.text,cursor:"pointer",width:"100%",outline:"none"}}>
-            {ESTADOS_DEFAULT.map(s=><option key={s}>{s}</option>)}
+            {ESTADOS_DEFAULT.map(s=><option key={s} style={{background:c.surface,color:c.text}}>{s}</option>)}
           </select>
         </div>
         {[["Cuándo",tudu?.cuando||"Sin fecha"],["Tipo",`${emoji} ${tudu?.tipo}`],["Tamaño",tudu?.tamano||"M"]].map(([l,v])=>(
@@ -695,7 +695,7 @@ function ListView({title,tudus=[],loading,onTudu,dark:dk}) {
   const [filterEstado,setFilterEstado] = useState("");
   const [filterTipo,setFilterTipo]     = useState("");
   const [filterCuando,setFilterCuando] = useState("");
-  const drag = useRef(null);
+  const drag = useRef<number|null>(null);
 
   let filtered = tudus;
   if(filterEstado) filtered = filtered.filter(t=>t.estado===filterEstado);
@@ -706,6 +706,12 @@ function ListView({title,tudus=[],loading,onTudu,dark:dk}) {
   const sorted = order.map(id=>filtered.find(t=>t.id===id)).filter(Boolean);
   if(sorted.length<filtered.length) filtered.forEach(t=>{if(!sorted.find(s=>s.id===t.id))sorted.push(t);});
 
+  const persistOrder = (newOrder: string[]) => {
+    newOrder.forEach((id,i)=>{
+      updateTudu(id,{orden:i}).catch(err=>console.error("Error guardando orden:",err));
+    });
+  };
+
   return (
     <main style={{display:"flex",flexDirection:"column",gap:10}}>
       <h1 style={{fontSize:17,fontWeight:500,color:c.text,margin:0}}>{title}</h1>
@@ -713,17 +719,17 @@ function ListView({title,tudus=[],loading,onTudu,dark:dk}) {
         <select aria-label="Filtrar estado" value={filterEstado} onChange={e=>setFilterEstado(e.target.value)}
           style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
           <option value="">Todos los estados</option>
-          {ESTADOS_DEFAULT.map(s=><option key={s} value={s}>{s}</option>)}
+          {ESTADOS_DEFAULT.map(s=><option key={s} value={s} style={{background:c.surface,color:c.text}}>{s}</option>)}
         </select>
         <select aria-label="Filtrar tipo" value={filterTipo} onChange={e=>setFilterTipo(e.target.value)}
           style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
-          <option value="">Todos los tipos</option>
-          {TUDU_TYPES.map(t=>{const clean=t.replace(/^.+\s/,"");return <option key={clean} value={clean}>{t}</option>;})}
+          <option value="" style={{background:c.surface,color:c.text}}>Todos los tipos</option>
+          {TUDU_TYPES.map(t=>{const clean=t.replace(/^.+\s/,"");return <option key={clean} value={clean} style={{background:c.surface,color:c.text}}>{t}</option>;})}
         </select>
         <select aria-label="Filtrar fecha" value={filterCuando} onChange={e=>setFilterCuando(e.target.value)}
           style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
-          <option value="">Cualquier fecha</option>
-          {CUANDO.map(q=><option key={q} value={q}>{q}</option>)}
+          <option value="" style={{background:c.surface,color:c.text}}>Cualquier fecha</option>
+          {CUANDO.map(q=><option key={q} value={q} style={{background:c.surface,color:c.text}}>{q}</option>)}
         </select>
       </div>
       {loading&&<p style={{fontSize:14,color:c.textFaint,textAlign:"center",padding:20}}>Cargando...</p>}
@@ -738,7 +744,7 @@ function ListView({title,tudus=[],loading,onTudu,dark:dk}) {
               onDragOver={e=>e.preventDefault()}
               onDrop={()=>{
                 if(drag.current===null||drag.current===i) return;
-                const n=[...order];const[m]=n.splice(drag.current,1);n.splice(i,0,m);setOrder(n);drag.current=null;
+                const n=[...order];const[m]=n.splice(drag.current,1);n.splice(i,0,m);setOrder(n);persistOrder(n);drag.current=null;
               }}
               style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:c.surface,border:`1px solid ${c.border}`,borderRadius:8,marginBottom:4}}>
               <span style={{color:c.border2,cursor:"grab",fontSize:13}}>⠿</span>

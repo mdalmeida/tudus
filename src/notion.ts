@@ -23,6 +23,7 @@ export type Tudu = {
   tamano: string;
   etiquetas: string[];
   contenido: string;
+  orden: number;
   eliminado: boolean;
 };
 
@@ -40,6 +41,7 @@ function parsePage(p: any): Tudu {
     tamano: pr["Tamaño"]?.select?.name || "",
     etiquetas: pr["Etiquetas"]?.multi_select?.map((t: any) => t.name) || [],
     contenido: pr["Contenido"]?.rich_text?.[0]?.plain_text || "",
+    orden: pr["Orden"]?.number ?? 0,
     eliminado: pr["Eliminado"]?.checkbox || false,
   };
 }
@@ -70,6 +72,8 @@ function buildProps(data: Partial<Omit<Tudu, "id">>) {
     props["Etiquetas"] = { multi_select: data.etiquetas.map(name => ({ name })) };
   if (data.contenido !== undefined)
     props["Contenido"] = { rich_text: [{ text: { content: data.contenido } }] };
+  if (data.orden !== undefined)
+    props["Orden"] = { number: data.orden };
   if (data.eliminado !== undefined)
     props["Eliminado"] = { checkbox: data.eliminado };
   return props;
@@ -79,7 +83,10 @@ export async function getTudus(): Promise<Tudu[]> {
   const pages: any[] = [];
   let cursor: string | undefined;
   do {
-    const body: any = { filter: { property: "Eliminado", checkbox: { equals: false } } };
+    const body: any = {
+      filter: { property: "Eliminado", checkbox: { equals: false } },
+      sorts: [{ property: "Orden", direction: "ascending" }],
+    };
     if (cursor) body.start_cursor = cursor;
     const data = await notionFetch(`/databases/${DB}/query`, "POST", body);
     pages.push(...data.results);
