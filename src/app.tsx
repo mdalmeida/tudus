@@ -252,9 +252,9 @@ function TuduForm({title,action,onClose,onCreated,editTudu,dark:dk}) {
   const [cuando,setCuando]     = useState(et?.cuando||"Sin fecha");
   const [deadline,setDeadline] = useState(et?.deadline||"");
   const [selColor,setSelColor] = useState(matchColor>=0?matchColor:0);
-  const [selSize,setSelSize]   = useState(2);
+  const [selSize,setSelSize]   = useState(matchSize>=0?matchSize:2);
   const [selIcon,setSelIcon]   = useState("CheckSquare");
-  const [tags,setTags]         = useState("");
+  const [tags,setTags]         = useState(et?.etiquetas?.join(", ")||"");
   const [saving,setSaving]     = useState(false);
   const dateHint = calcDate(cuando);
   const titleId = "form-title-"+action;
@@ -571,25 +571,15 @@ function PomoWidget({onClose,onOpenTask,isMobile,dark:dk}) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({onNew,onTudu,onRefresh,dark:dk,isMobile}) {
+function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobile}) {
   const c = th(dk||false);
-  const [allTudus,setAllTudus] = useState<any[]>([]);
-  const [loading,setLoading]   = useState(true);
+  const allTudus = rawTudus.map(tuduToPool);
   const [dragId,setDragId]     = useState(null);
   const [overSlot,setOverSlot] = useState(null);
   const [quickVal,setQuickVal] = useState("");
   const [quickSaving,setQuickSaving] = useState(false);
   const slotRefs = useRef({});
   const {show,Toast} = useToast();
-
-  const reload = ()=>{
-    setLoading(true);
-    getTudus()
-      .then(tudus => setAllTudus(tudus.map(tuduToPool)))
-      .catch(err => { console.error("Error cargando tudús:",err); show("Error al cargar tudús"); })
-      .finally(()=>setLoading(false));
-  };
-  useEffect(reload,[]);
 
   const SLOTS = ["Hoy","Mañana / Pasado","Esta semana","Próxima semana"];
   const pool = allTudus.filter(t=>!t.cuando||t.cuando==="Sin fecha"||t.cuando==="Algún día");
@@ -617,7 +607,7 @@ function Dashboard({onNew,onTudu,onRefresh,dark:dk,isMobile}) {
     if(cuando){
       setAllTudus(p=>p.map(t=>t.id===dragId?{...t,cuando}:t));
       show("Asignado a: "+slot);
-      try{ await updateTudu(dragId,{cuando}); }catch(err){ console.error(err); show("Error al mover"); reload(); }
+      try{ await updateTudu(dragId,{cuando}); onRefresh?.(); }catch(err){ console.error(err); show("Error al mover"); onRefresh?.(); }
     }
   };
 
@@ -628,7 +618,7 @@ function Dashboard({onNew,onTudu,onRefresh,dark:dk,isMobile}) {
       await createTudu({title:quickVal.trim(),categoria:"Inbox",estado:"Por hacer",cuando:"Sin fecha"});
       setQuickVal("");
       show("Tudú creado en Inbox");
-      reload();
+      onRefresh?.();
     }catch(err){ console.error(err); show("Error al crear"); }
     finally{ setQuickSaving(false); }
   };
@@ -700,61 +690,81 @@ function Dashboard({onNew,onTudu,onRefresh,dark:dk,isMobile}) {
 }
 
 // ── ListView ──────────────────────────────────────────────────────────────────
-function ListView({title,onTudu,dark:dk}) {
+function ListView({title,tudus=[],loading,onTudu,dark:dk}) {
   const c = th(dk||false);
-  const ITEMS = [
-    {id:1,type:"📋",title:"Reunión con equipo",cat:"💼",status:"En curso",date:"Hoy"},
-    {id:2,type:"📊",title:"Presupuesto Q2",    cat:"💼",status:"Empezada",date:"Esta semana"},
-    {id:3,type:"💡",title:"Leer sobre hábitos",cat:"✦", status:"Por hacer",date:"—"},
-    {id:4,type:"📋",title:"Meditación matutina",cat:"❤",status:"Por hacer",date:"—"},
-    {id:5,type:"📋",title:"Onboarding dev",    cat:"💼",status:"Listo",   date:"Ayer",done:true},
-  ];
-  const [order,setOrder] = useState(ITEMS);
+  const [filterEstado,setFilterEstado] = useState("");
+  const [filterTipo,setFilterTipo]     = useState("");
+  const [filterCuando,setFilterCuando] = useState("");
   const drag = useRef(null);
+
+  let filtered = tudus;
+  if(filterEstado) filtered = filtered.filter(t=>t.estado===filterEstado);
+  if(filterTipo)   filtered = filtered.filter(t=>t.tipo===filterTipo);
+  if(filterCuando) filtered = filtered.filter(t=>t.cuando===filterCuando);
+  const [order,setOrder] = useState<string[]>([]);
+  useEffect(()=>setOrder(filtered.map(t=>t.id)),[tudus,filterEstado,filterTipo,filterCuando]);
+  const sorted = order.map(id=>filtered.find(t=>t.id===id)).filter(Boolean);
+  if(sorted.length<filtered.length) filtered.forEach(t=>{if(!sorted.find(s=>s.id===t.id))sorted.push(t);});
+
   return (
     <main style={{display:"flex",flexDirection:"column",gap:10}}>
       <h1 style={{fontSize:17,fontWeight:500,color:c.text,margin:0}}>{title}</h1>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {["Todos los estados","Todos los tipos","Cualquier fecha"].map(o=>(
-          <select key={o} aria-label={o} style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
-            <option>{o}</option>
-          </select>
-        ))}
+        <select aria-label="Filtrar estado" value={filterEstado} onChange={e=>setFilterEstado(e.target.value)}
+          style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
+          <option value="">Todos los estados</option>
+          {ESTADOS_DEFAULT.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select aria-label="Filtrar tipo" value={filterTipo} onChange={e=>setFilterTipo(e.target.value)}
+          style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
+          <option value="">Todos los tipos</option>
+          {TUDU_TYPES.map(t=>{const clean=t.replace(/^.+\s/,"");return <option key={clean} value={clean}>{t}</option>;})}
+        </select>
+        <select aria-label="Filtrar fecha" value={filterCuando} onChange={e=>setFilterCuando(e.target.value)}
+          style={{fontSize:13,padding:"4px 8px",border:`1px solid ${c.border}`,borderRadius:6,background:c.surface2,color:c.text,outline:"none"}}>
+          <option value="">Cualquier fecha</option>
+          {CUANDO.map(q=><option key={q} value={q}>{q}</option>)}
+        </select>
       </div>
+      {loading&&<p style={{fontSize:14,color:c.textFaint,textAlign:"center",padding:20}}>Cargando...</p>}
+      {!loading&&sorted.length===0&&<p style={{fontSize:14,color:c.textFaint,textAlign:"center",padding:20}}>No hay tudús</p>}
       <ul style={{listStyle:"none",padding:0,margin:0}}>
-        {order.map((item,i)=>(
-          <li key={item.id} draggable
-            onDragStart={()=>drag.current=i}
-            onDragOver={e=>e.preventDefault()}
-            onDrop={()=>{
-              if(drag.current===null||drag.current===i) return;
-              const n=[...order];const[m]=n.splice(drag.current,1);n.splice(i,0,m);setOrder(n);drag.current=null;
-            }}
-            style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:c.surface,border:`1px solid ${c.border}`,borderRadius:8,marginBottom:4}}>
-            <span style={{color:c.border2,cursor:"grab",fontSize:13}}>⠿</span>
-            <div style={{width:12,height:12,borderRadius:"50%",border:`2px solid ${item.done?"#22C55E":c.border2}`,background:item.done?"#22C55E":"transparent",flexShrink:0}}/>
-            <span style={{fontSize:13}}>{item.type}</span>
-            <button type="button" onClick={onTudu} style={{flex:1,fontSize:14,textDecoration:item.done?"line-through":"none",color:item.done?c.textFaint:c.text,background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>{item.title}</button>
-            <span style={{fontSize:11,color:c.textFaint}}>{item.cat}</span>
-            <SBadge s={item.status}/>
-            <span style={{fontSize:13,color:c.textFaint}}>{item.date}</span>
-          </li>
-        ))}
+        {sorted.map((item,i)=>{
+          const done=item.estado==="Listo"||item.estado==="No lo haré";
+          const emoji=TIPO_EMOJI[item.tipo]||"📋";
+          return (
+            <li key={item.id} draggable
+              onDragStart={()=>drag.current=i}
+              onDragOver={e=>e.preventDefault()}
+              onDrop={()=>{
+                if(drag.current===null||drag.current===i) return;
+                const n=[...order];const[m]=n.splice(drag.current,1);n.splice(i,0,m);setOrder(n);drag.current=null;
+              }}
+              style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:c.surface,border:`1px solid ${c.border}`,borderRadius:8,marginBottom:4}}>
+              <span style={{color:c.border2,cursor:"grab",fontSize:13}}>⠿</span>
+              <div style={{width:12,height:12,borderRadius:"50%",border:`2px solid ${done?"#22C55E":c.border2}`,background:done?"#22C55E":"transparent",flexShrink:0}}/>
+              <span style={{fontSize:13}}>{emoji}</span>
+              <button type="button" onClick={()=>onTudu(item)} style={{flex:1,fontSize:14,textDecoration:done?"line-through":"none",color:done?c.textFaint:c.text,background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>{item.title}</button>
+              <span style={{fontSize:11,color:c.textFaint}}>{item.categoria}</span>
+              <SBadge s={item.estado}/>
+              <span style={{fontSize:13,color:c.textFaint}}>{item.cuando||"—"}</span>
+            </li>
+          );
+        })}
       </ul>
     </main>
   );
 }
 
 // ── CategoryView ──────────────────────────────────────────────────────────────
-function CategoryView({onView,onTudu}) {
+function CategoryView({tudus=[],onView,onTudu}) {
   const [desc,setDesc]       = useState("Todo lo relacionado con mi vida profesional y proyectos laborales.");
   const [editDesc,setEditDesc] = useState(false);
   const [hoverDesc,setHoverDesc] = useState(false);
-  const TOP = [
-    {type:"📋 Tarea",   title:"Reunión con equipo",  date:"Hoy",        bg:PCOLORS[0].bg,tx:PCOLORS[0].tx},
-    {type:"📊 Analizar",title:"Presupuesto Q2",       date:"Esta semana",bg:PCOLORS[1].bg,tx:PCOLORS[1].tx},
-    {type:"✉ Mail",     title:"Responder propuestas", date:"Mañana",     bg:PCOLORS[2].bg,tx:PCOLORS[2].tx},
-  ];
+  const TOP = tudus.slice(0,3).map((t,i)=>({
+    ...t, type:`${TIPO_EMOJI[t.tipo]||"📋"} ${t.tipo}`, date:t.cuando||"Sin fecha",
+    bg:PCOLORS[i%PCOLORS.length].bg, tx:PCOLORS[i%PCOLORS.length].tx,
+  }));
   const pill=(children,w)=>(
     <div style={{borderRadius:8,background:"rgba(255,255,255,0.1)",border:"0.5px solid rgba(255,255,255,0.18)",flexShrink:0,width:w||"auto"}}>
       {children}
@@ -808,7 +818,7 @@ function CategoryView({onView,onTudu}) {
           <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".5px",color:"rgba(255,255,255,0.4)",marginBottom:6,fontWeight:500}}>Tudús más importantes</div>
           <div style={{display:"flex",gap:8}}>
             {TOP.map((item,i)=>(
-              <button key={i} type="button" onClick={onTudu} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",background:item.bg,color:item.tx,boxShadow:"1px 2px 6px rgba(0,0,0,0.18)",border:"none",textAlign:"left"}}
+              <button key={i} type="button" onClick={()=>onTudu(item)} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",background:item.bg,color:item.tx,boxShadow:"1px 2px 6px rgba(0,0,0,0.18)",border:"none",textAlign:"left"}}
                 onMouseOver={e=>e.currentTarget.style.transform="scale(1.02)"}
                 onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
                 <div style={{fontSize:11,opacity:.6,marginBottom:2}}>{item.type}</div>
@@ -977,7 +987,7 @@ function GanttView({dark:dk}) {
 }
 
 // ── CanvasView ────────────────────────────────────────────────────────────────
-function CanvasView({onNew,onTudu,dark:dk,isMobile}) {
+function CanvasView({tudus=[],loading,onNew,onTudu,dark:dk,isMobile}) {
   const c = th(dk||false);
   const [view,setView] = useState(isMobile?"list":"postits");
   const TABS = isMobile
@@ -1001,7 +1011,7 @@ function CanvasView({onNew,onTudu,dark:dk,isMobile}) {
       </div>
       <div role="tabpanel">
         {view==="postits"  && <PostitsView onTudu={onTudu} dark={dk}/>}
-        {view==="list"     && <ListView title="My Work" onTudu={onTudu} dark={dk}/>}
+        {view==="list"     && <ListView title="My Work" tudus={tudus} loading={loading} onTudu={onTudu} dark={dk}/>}
         {view==="kanban"   && <KanbanView init={KANBAN_INIT} onTudu={onTudu} dark={dk}/>}
         {view==="kplan"    && <><p style={{fontSize:13,color:c.textFaint,margin:"0 0 4px"}}>Arrastrá cards entre columnas para re-planificar</p><KanbanView init={KPLAN_INIT} onTudu={onTudu} dark={dk}/></>}
         {view==="gantt"    && <GanttView dark={dk}/>}
@@ -1208,7 +1218,21 @@ export default function App() {
   const [refreshKey,setRefreshKey] = useState(0);
   const [searchExp,setSearchExp] = useState(false);
   const [cats]                   = useState(CATS_INIT);
+  const [allTudus,setAllTudus]   = useState<any[]>([]);
+  const [tudusLoading,setTudusLoading] = useState(true);
   const isMobile                 = useIsMobile();
+
+  const loadTudus = ()=>{
+    setTudusLoading(true);
+    getTudus()
+      .then(tudus=>setAllTudus(tudus))
+      .catch(err=>console.error("Error cargando tudús:",err))
+      .finally(()=>setTudusLoading(false));
+  };
+  useEffect(loadTudus,[refreshKey]);
+
+  const openTudu = (t: any)=>{ setSelectedTudu(t); setShowTudu(true); };
+  const refresh = ()=>setRefreshKey(k=>k+1);
 
   useEffect(()=>{ document.documentElement.classList.toggle("dark",dark); },[dark]);
   useEffect(()=>{ if(isMobile) setCollapsed(true); },[isMobile]);
@@ -1261,11 +1285,11 @@ export default function App() {
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
         {!isMobile&&<Sidebar screen={screen} onNav={setScreen} collapsed={collapsed} onToggle={()=>setCollapsed(s=>!s)} dark={dark} cats={cats}/>}
         <div style={{flex:1,overflowY:"auto",padding:isMobile?"12px":"16px",paddingBottom:isMobile?72:16,background:c.bg}}>
-          {screen==="dashboard" && <Dashboard key={refreshKey} onNew={()=>setShowNew(true)} onTudu={(t)=>{setSelectedTudu(t);setShowTudu(true);}} onRefresh={()=>setRefreshKey(k=>k+1)} dark={dark} isMobile={isMobile}/>}
-          {screen==="all"       && <ListView title="Todos los tudús" onTudu={()=>setShowTudu(true)} dark={dark}/>}
-          {screen==="inbox"     && <ListView title="Inbox" onTudu={()=>setShowTudu(true)} dark={dark}/>}
-          {screen==="category"  && <CategoryView onView={()=>setScreen("canvas")} onTudu={()=>setShowTudu(true)}/>}
-          {screen==="canvas"    && <CanvasView onNew={()=>setShowNew(true)} onTudu={()=>setShowTudu(true)} dark={dark} isMobile={isMobile}/>}
+          {screen==="dashboard" && <Dashboard key={refreshKey} tudus={allTudus} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} onRefresh={refresh} dark={dark} isMobile={isMobile}/>}
+          {screen==="all"       && <ListView title="Todos los tudús" tudus={allTudus} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
+          {screen==="inbox"     && <ListView title="Inbox" tudus={allTudus.filter(t=>t.categoria==="Inbox")} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
+          {screen==="category"  && <CategoryView tudus={allTudus.filter(t=>t.categoria==="My Work")} onView={()=>setScreen("canvas")} onTudu={openTudu}/>}
+          {screen==="canvas"    && <CanvasView tudus={allTudus.filter(t=>t.categoria==="My Work")} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} dark={dark} isMobile={isMobile}/>}
           {screen==="config"    && <ConfigView dark={dark} onToggle={()=>setDark(d=>!d)}/>}
         </div>
       </div>
@@ -1280,8 +1304,8 @@ export default function App() {
         <span style={{display:"none",color:"#fff",fontSize:22,fontWeight:300}}>+</span>
       </button>
 
-      {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} onCreated={()=>setRefreshKey(k=>k+1)} dark={dark}/>}
-      {showTudu && <TuduDetail tudu={selectedTudu} onClose={()=>{setShowTudu(false);setSelectedTudu(null);}} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} onSaved={()=>setRefreshKey(k=>k+1)} dark={dark}/>}
+      {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} onCreated={refresh} dark={dark}/>}
+      {showTudu && <TuduDetail tudu={selectedTudu} onClose={()=>{setShowTudu(false);setSelectedTudu(null);}} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} onSaved={refresh} dark={dark}/>}
       {showPomo && <PomoWidget onClose={()=>setShowPomo(false)} onOpenTask={()=>setShowTudu(true)} isMobile={isMobile} dark={dark}/>}
     </div>
   );
