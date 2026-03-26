@@ -923,33 +923,64 @@ function PostitsView({onTudu,dark:dk}) {
 }
 
 // ── KanbanView ────────────────────────────────────────────────────────────────
-function KanbanView({init,onTudu,dark:dk}) {
+const KPLAN_COLS = ["Vencido","Hoy","Mañana / Pasado","Esta semana","Próxima semana","Sin fecha"];
+function KanbanView({tudus=[],mode="estado",onTudu,onRefresh,dark:dk}) {
   const c = th(dk||false);
-  const [cols,setCols] = useState(init);
-  const drag = useRef(null);
-  const onDS=(col,id)=>{drag.current={col,id};};
-  const onDrop=target=>{
-    if(!drag.current) return;
-    const{col,id}=drag.current;drag.current=null;if(col===target)return;
-    setCols(prev=>{const card=(prev[col]||[]).find(item=>item.id===id);if(!card)return prev;return{...prev,[col]:(prev[col]||[]).filter(item=>item.id!==id),[target]:[...(prev[target]||[]),card]};});
+  const columns = mode==="cuando"?KPLAN_COLS:ESTADOS_DEFAULT;
+  const drag = useRef<{col:string,id:string}|null>(null);
+  const [overCol,setOverCol] = useState<string|null>(null);
+  const [moved,setMoved] = useState<Record<string,string>>({});
+
+  const field = mode==="cuando"?"cuando":"estado";
+  const getCol = (t: any) => {
+    if(moved[t.id]) return moved[t.id];
+    if(mode==="cuando") return CUANDO_TO_SLOT[t.cuando]||t.cuando||"Sin fecha";
+    return t.estado||"Por hacer";
   };
+
+  const colItems = (col: string) => tudus.filter(t=>getCol(t)===col);
+  const colColor = (col: string) => col==="Vencido"?"#EF4444":col==="Hoy"||col==="En curso"?BRAND:c.textFaint;
+  const cardColor = (t: any, i: number) => PCOLORS[i % PCOLORS.length];
+
+  const onDS=(col: string,id: string)=>{drag.current={col,id};};
+  const handleDrop=async(target: string)=>{
+    if(!drag.current) return;
+    const{col,id}=drag.current;drag.current=null;setOverCol(null);
+    if(col===target) return;
+    const value = mode==="cuando"?SLOT_TO_CUANDO[target]||target:target;
+    setMoved(p=>({...p,[id]:target}));
+    try{ await updateTudu(id,{[field]:value}); onRefresh?.(); }catch(err){ console.error(err); onRefresh?.(); }
+  };
+
   return (
     <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
-      {Object.entries(cols).map(([col,cards])=>(
-        <div key={col} style={{minWidth:138,maxWidth:138,background:c.surface2,borderRadius:12,padding:8,flexShrink:0,border:col==="Vencido"?"2px solid #EF4444":col==="Hoy"?`2px solid ${BRAND}`:`1px solid ${c.border}`}}
-          onDragOver={e=>e.preventDefault()} onDrop={()=>onDrop(col)}>
-          <h3 style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:".4px",margin:"0 0 6px 0",color:col==="Vencido"?"#EF4444":col==="Hoy"?BRAND:c.textFaint}}>{col}</h3>
-          {(cards||[]).length===0&&<p style={{fontSize:13,color:c.textFaint,textAlign:"center",padding:"8px 0",margin:0}}>Sin tudús</p>}
-          {(cards||[]).map(item=>(
-            <div key={item.id} draggable onDragStart={()=>onDS(col,item.id)} onDragEnd={()=>{drag.current=null;}}
-              style={{background:c.surface,border:`0.5px solid ${c.border}`,borderLeft:`3px solid ${item.lc}`,borderRadius:6,padding:"6px 8px",marginBottom:4,cursor:"grab",fontSize:14}}>
-              <div style={{fontSize:11,color:c.textFaint}}>{item.type}</div>
-              <button type="button" onClick={onTudu} style={{display:"block",fontWeight:500,fontSize:13,color:c.text,background:"none",border:"none",cursor:"pointer",padding:0,textAlign:"left",width:"100%"}}>{item.title}</button>
-              <div style={{fontSize:11,color:c.textFaint,marginTop:2}}>{item.date}</div>
-            </div>
-          ))}
-        </div>
-      ))}
+      {columns.map(col=>{
+        const items=colItems(col);
+        const over=overCol===col;
+        return (
+          <div key={col} style={{minWidth:148,maxWidth:148,background:over?"rgba(117,176,228,0.06)":c.surface2,borderRadius:12,padding:8,flexShrink:0,border:over?`2px solid ${BRAND}`:`1px solid ${c.border}`,transition:"border .15s,background .15s"}}
+            onDragOver={e=>{e.preventDefault();setOverCol(col);}}
+            onDragLeave={()=>setOverCol(null)}
+            onDrop={()=>handleDrop(col)}>
+            <h3 style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:".4px",margin:"0 0 6px 0",color:colColor(col)}}>{col} {items.length>0&&`(${items.length})`}</h3>
+            {items.length===0&&<p style={{fontSize:13,color:over?BRAND:c.textFaint,textAlign:"center",padding:"8px 0",margin:0}}>{over?"¡Soltá acá!":"Sin tudús"}</p>}
+            {items.map((item,i)=>{
+              const pc=cardColor(item,i);
+              const emoji=TIPO_EMOJI[item.tipo]||"📋";
+              return (
+                <div key={item.id} draggable="true"
+                  onDragStart={()=>onDS(col,item.id)} onDragEnd={()=>{drag.current=null;setOverCol(null);}}
+                  onClick={()=>onTudu(item)}
+                  style={{background:c.surface,border:`0.5px solid ${c.border}`,borderLeft:`3px solid ${pc.bg}`,borderRadius:6,padding:"6px 8px",marginBottom:4,cursor:"grab",fontSize:14}}>
+                  <div style={{pointerEvents:"none",fontSize:11,color:c.textFaint}}>{emoji} {item.tipo}</div>
+                  <div style={{pointerEvents:"none",fontWeight:500,fontSize:13,color:c.text,lineHeight:1.3}}>{item.title}</div>
+                  <div style={{pointerEvents:"none",fontSize:11,color:c.textFaint,marginTop:2}}>{mode==="cuando"?item.estado:item.cuando||"Sin fecha"}</div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1048,7 +1079,7 @@ function GanttView({dark:dk}) {
 }
 
 // ── CanvasView ────────────────────────────────────────────────────────────────
-function CanvasView({tudus=[],loading,onNew,onTudu,dark:dk,isMobile}) {
+function CanvasView({tudus=[],loading,onNew,onTudu,onRefresh,dark:dk,isMobile}) {
   const c = th(dk||false);
   const [view,setView] = useState(isMobile?"list":"postits");
   const TABS = isMobile
@@ -1073,8 +1104,8 @@ function CanvasView({tudus=[],loading,onNew,onTudu,dark:dk,isMobile}) {
       <div role="tabpanel">
         {view==="postits"  && <PostitsView onTudu={onTudu} dark={dk}/>}
         {view==="list"     && <ListView title="My Work" tudus={tudus} loading={loading} onTudu={onTudu} dark={dk}/>}
-        {view==="kanban"   && <KanbanView init={KANBAN_INIT} onTudu={onTudu} dark={dk}/>}
-        {view==="kplan"    && <><p style={{fontSize:13,color:c.textFaint,margin:"0 0 4px"}}>Arrastrá cards entre columnas para re-planificar</p><KanbanView init={KPLAN_INIT} onTudu={onTudu} dark={dk}/></>}
+        {view==="kanban"   && <KanbanView tudus={tudus} mode="estado" onTudu={onTudu} onRefresh={onRefresh} dark={dk}/>}
+        {view==="kplan"    && <><p style={{fontSize:13,color:c.textFaint,margin:"0 0 4px"}}>Arrastrá cards entre columnas para re-planificar</p><KanbanView tudus={tudus} mode="cuando" onTudu={onTudu} onRefresh={onRefresh} dark={dk}/></>}
         {view==="gantt"    && <GanttView dark={dk}/>}
       </div>
     </main>
@@ -1360,7 +1391,7 @@ export default function App() {
           {screen==="all"       && <ListView title="Todos los tudús" tudus={allTudus} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
           {screen==="inbox"     && <ListView title="Inbox" tudus={allTudus.filter(t=>t.categoria==="Inbox")} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
           {screen==="category"  && <CategoryView tudus={allTudus.filter(t=>t.categoria===selectedCat)} onView={()=>setScreen("canvas")} onTudu={openTudu}/>}
-          {screen==="canvas"    && <CanvasView tudus={allTudus.filter(t=>t.categoria===selectedCat)} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} dark={dark} isMobile={isMobile}/>}
+          {screen==="canvas"    && <CanvasView tudus={allTudus.filter(t=>t.categoria===selectedCat)} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} onRefresh={refresh} dark={dark} isMobile={isMobile}/>}
           {screen==="config"    && <ConfigView dark={dark} onToggle={()=>setDark(d=>!d)}/>}
         </div>
       </div>
