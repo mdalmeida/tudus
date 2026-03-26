@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
-import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, type Tudu } from "./notion";
+import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, type Tudu } from "./supabase";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray, ArrowsClockwise } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
@@ -937,7 +937,10 @@ function PostitsView({tudus=[],onTudu,dark:dk}) {
     setPos(prev=>{
       const next={...prev};
       tudus.forEach((t:any,i:number)=>{
-        if(!next[t.id]) next[t.id]={x:20+(i%4)*160,y:16+Math.floor(i/4)*120};
+        if(!next[t.id]){
+          const saved = t.pos_x && t.pos_y;
+          next[t.id] = saved ? {x:t.pos_x,y:t.pos_y} : {x:20+(i%4)*160,y:16+Math.floor(i/4)*120};
+        }
       });
       return next;
     });
@@ -946,7 +949,7 @@ function PostitsView({tudus=[],onTudu,dark:dk}) {
   const persistPos=(id:string,x:number,y:number)=>{
     if(saveTimer.current[id]) clearTimeout(saveTimer.current[id]);
     saveTimer.current[id]=setTimeout(()=>{
-      updateTudu(id,{color:`${Math.round(x)},${Math.round(y)}`}).catch(err=>console.error(err));
+      updateTudu(id,{pos_x:Math.round(x),pos_y:Math.round(y)} as any).catch(err=>console.error(err));
     },600);
   };
 
