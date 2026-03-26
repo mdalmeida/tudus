@@ -241,7 +241,8 @@ const ED_TOOLS = [
   {icon:"•",cmd:"insertUnorderedList"},{icon:"1.",cmd:"insertOrderedList"},
   {icon:"🔗",cmd:"createLink",prompt:"URL:"},{icon:"—",cmd:"insertHorizontalRule"},{icon:"✕",cmd:"removeFormat"},
 ];
-function WysiwygEditor({placeholder,id}) {
+function WysiwygEditor({placeholder,id,dark:dk}) {
+  const c = th(dk||false);
   const ref = useRef(null);
   const exec = t=>{
     ref.current?.focus();
@@ -249,60 +250,91 @@ function WysiwygEditor({placeholder,id}) {
     else document.execCommand(t.cmd,false,t.val||null);
   };
   return (
-    <div style={{border:"1px solid #E5E7EB",borderRadius:8,overflow:"hidden"}}>
-      <div role="toolbar" aria-label="Formato" style={{display:"flex",flexWrap:"wrap",gap:2,padding:"4px 6px",borderBottom:"1px solid #E5E7EB",background:"#F9FAFB"}}>
+    <div style={{border:`1px solid ${c.border}`,borderRadius:8,overflow:"hidden"}}>
+      <div role="toolbar" aria-label="Formato" style={{display:"flex",flexWrap:"wrap",gap:2,padding:"4px 6px",borderBottom:`1px solid ${c.border}`,background:c.surface2}}>
         {ED_TOOLS.map(t=>(
           <button key={t.icon} type="button" aria-label={t.icon} onMouseDown={e=>{e.preventDefault();exec(t);}}
-            style={{padding:"2px 6px",fontSize:13,borderRadius:4,cursor:"pointer",border:"none",background:"transparent",color:"#6B7280",fontFamily:"monospace",minWidth:24}}
-            onMouseOver={e=>e.currentTarget.style.background="#E5E7EB"}
+            style={{padding:"2px 6px",fontSize:13,borderRadius:4,cursor:"pointer",border:"none",background:"transparent",color:c.textMuted,fontFamily:"monospace",minWidth:24}}
+            onMouseOver={e=>e.currentTarget.style.background=c.border}
             onMouseOut={e=>e.currentTarget.style.background="transparent"}>{t.icon}</button>
         ))}
       </div>
       <div ref={ref} id={id} contentEditable suppressContentEditableWarning
         role="textbox" aria-multiline="true" data-placeholder={placeholder||"Escribí acá..."}
-        style={{minHeight:100,padding:"8px 12px",fontSize:14,lineHeight:1.7,outline:"none",color:"#111",background:"#fff"}}/>
-      <style>{`[contenteditable]:empty:before{content:attr(data-placeholder);color:#9CA3AF;pointer-events:none}[contenteditable] h3{font-size:13px;font-weight:600;margin:4px 0}[contenteditable] ul{list-style:disc;padding-left:18px;margin:4px 0}[contenteditable] ol{list-style:decimal;padding-left:18px;margin:4px 0}[contenteditable] a{color:#3B82F6;text-decoration:underline}[contenteditable] strong{font-weight:700}[contenteditable] em{font-style:italic}*:focus-visible{outline:2px solid ${BRAND};outline-offset:2px}`}</style>
+        style={{minHeight:100,padding:"8px 12px",fontSize:14,lineHeight:1.7,outline:"none",color:c.text,background:c.surface}}/>
+      <style>{`[contenteditable]:empty:before{content:attr(data-placeholder);color:${c.textFaint};pointer-events:none}[contenteditable] h3{font-size:13px;font-weight:600;margin:4px 0}[contenteditable] ul{list-style:disc;padding-left:18px;margin:4px 0}[contenteditable] ol{list-style:decimal;padding-left:18px;margin:4px 0}[contenteditable] a{color:#3B82F6;text-decoration:underline}[contenteditable] strong{font-weight:700}[contenteditable] em{font-style:italic}*:focus-visible{outline:2px solid ${BRAND};outline-offset:2px}`}</style>
+    </div>
+  );
+}
+
+// ── DatePicker (campo Fecha unificado) ────────────────────────────────────────
+function DatePicker({cuando,deadline,onChange,dark:dk}) {
+  const c = th(dk||false);
+  const [open,setOpen] = useState(false);
+  const [tmpCuando,setTmpCuando] = useState(cuando||"Sin fecha");
+  const [tmpDate,setTmpDate] = useState(deadline||"");
+  const isExact = tmpCuando==="Fecha exacta";
+  const hint = !isExact && tmpCuando!=="Sin fecha" ? calcDate(tmpCuando) : null;
+  const display = cuando==="Fecha exacta" ? (deadline||"Elegir fecha") : cuando==="Sin fecha" ? "Sin fecha" : `${cuando}${deadline?" · "+deadline:""}`;
+  const save=()=>{
+    const dl = isExact ? tmpDate : calcDate(tmpCuando)||null;
+    onChange(tmpCuando==="Fecha exacta"?"Sin fecha":tmpCuando, dl||null);
+    setOpen(false);
+  };
+  const clear=()=>{ onChange("Sin fecha",null); setOpen(false); };
+  return (
+    <div style={{position:"relative"}}>
+      <button type="button" onClick={()=>{setTmpCuando(cuando||"Sin fecha");setTmpDate(deadline||"");setOpen(!open);}}
+        style={{width:"100%",padding:"8px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:8,background:c.surface,color:c.text,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
+        {display}
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:60,marginTop:4,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
+          <select value={tmpCuando} onChange={e=>{setTmpCuando(e.target.value);if(e.target.value!=="Fecha exacta")setTmpDate("");}}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}>
+            {[...CUANDO,"Fecha exacta"].map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
+          </select>
+          {isExact&&<input type="date" value={tmpDate} onChange={e=>setTmpDate(e.target.value)}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}/>}
+          {hint&&<div style={{fontSize:12,color:BRAND,marginBottom:8}}>→ {hint}</div>}
+          <div style={{display:"flex",gap:6,justifyContent:"space-between"}}>
+            <button type="button" onClick={clear} style={{fontSize:12,color:c.textFaint,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0}}>Sin fecha</button>
+            <div style={{display:"flex",gap:6}}>
+              <Btn sm ghost onClick={()=>setOpen(false)}>Cancelar</Btn>
+              <Btn sm onClick={save}>Guardar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── TuduForm ──────────────────────────────────────────────────────────────────
-function TuduForm({title,action,onClose,onCreated,editTudu,dark:dk}) {
+function TuduForm({title:formTitle,action,onClose,onCreated,editTudu,dark:dk,defaultCat}) {
+  const c = th(dk||false);
   const et = editTudu;
-  const matchTipo = et?.tipo ? TUDU_TYPES.find(t=>t.includes(et.tipo))||TUDU_TYPES[0] : TUDU_TYPES[0];
-  const matchColor = et?.color ? PCOLORS.findIndex(p=>p.bg===et.color) : 0;
-  const matchSize = et?.tamano ? ["XS","S","M","L","XL"].indexOf(et.tamano) : 2;
   const [nombre,setNombre]     = useState(et?.title||"");
-  const [tipo,setTipo]         = useState(matchTipo);
-  const [cat,setCat]           = useState(et?.categoria||CATEGORIAS_NAMES[0]);
+  const [tipo,setTipo]         = useState(et?.tipo||"Tarea");
+  const [cat,setCat]           = useState(et?.categoria||defaultCat||CATEGORIAS_NAMES[0]);
   const [estado,setEstado]     = useState(et?.estado||ESTADOS_DEFAULT[0]);
   const [cuando,setCuando]     = useState(et?.cuando||"Sin fecha");
   const [deadline,setDeadline] = useState(et?.deadline||"");
-  const [selColor,setSelColor] = useState(matchColor>=0?matchColor:0);
-  const [selSize,setSelSize]   = useState(matchSize>=0?matchSize:2);
-  const [selIcon,setSelIcon]   = useState("CheckSquare");
   const [tags,setTags]         = useState(et?.etiquetas?.join(", ")||"");
+  const [contenido,setContenido] = useState(et?.contenido||"");
   const [saving,setSaving]     = useState(false);
-  const dateHint = calcDate(cuando);
   const titleId = "form-title-"+action;
-  const SIZES = ["XS","S","M","L","XL"];
+  const TIPOS_CLEAN = TUDU_TYPES.map(t=>t.replace(/^.+\s/,""));
 
   const handleSubmit = async () => {
     if (!nombre.trim()) return;
     setSaving(true);
     try {
-      const tipoClean = tipo.replace(/^.+\s/,"");
-      const data = {
-        title: nombre.trim(),
-        tipo: tipoClean,
-        categoria: cat,
-        estado,
-        cuando,
+      const data: any = {
+        title: nombre.trim(), tipo, categoria: cat, estado, cuando,
         deadline: deadline || null,
-        color: PCOLORS[selColor].bg,
-        tamano: SIZES[selSize],
         etiquetas: tags.split(",").map(t=>t.trim()).filter(Boolean),
-        contenido: "",
+        contenido,
       };
       if(et?.id) await updateTudu(et.id, data);
       else await createTudu(data);
@@ -317,46 +349,23 @@ function TuduForm({title,action,onClose,onCreated,editTudu,dark:dk}) {
   return (
     <Overlay onClose={onClose} dark={dk} titleId={titleId}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-        <h2 id={titleId} style={{fontSize:14,fontWeight:500,margin:0}}>{title}</h2>
-        <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:"#9CA3AF"}}>✕</button>
+        <h2 id={titleId} style={{fontSize:14,fontWeight:500,margin:0,color:c.text}}>{formTitle}</h2>
+        <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:c.textFaint}}>✕</button>
       </div>
       <Fld label="Título" id="f-title"><Inp id="f-title" dark={dk} placeholder="¿Qué tenés que hacer?" autoFocus value={nombre} onChange={e=>setNombre(e.target.value)}/></Fld>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk} value={tipo} onChange={e=>setTipo(e.target.value)}>{TUDU_TYPES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
-        <Fld label="Categoría" id="f-cat"><Sel id="f-cat" dark={dk} value={cat} onChange={e=>setCat(e.target.value)}>{CATEGORIAS_NAMES.map(v=><option key={v}>{v}</option>)}</Sel></Fld>
+        <Fld label="Estado" id="f-estado"><Sel id="f-estado" dark={dk} value={estado} onChange={e=>setEstado(e.target.value)}>{ESTADOS_DEFAULT.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}</Sel></Fld>
+        <Fld label="Categoría" id="f-cat"><Sel id="f-cat" dark={dk} value={cat} onChange={e=>setCat(e.target.value)}>{CATEGORIAS_NAMES.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}</Sel></Fld>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Estado" id="f-estado"><Sel id="f-estado" dark={dk} value={estado} onChange={e=>setEstado(e.target.value)}>{ESTADOS_DEFAULT.filter(v=>v!=="Terminando").map(v=><option key={v}>{v}</option>)}</Sel></Fld>
-        <Fld label="Cuándo" id="f-cuando">
-          <Sel id="f-cuando" dark={dk} value={cuando} onChange={e=>setCuando(e.target.value)}>{CUANDO.map(v=><option key={v}>{v}</option>)}</Sel>
-          {dateHint&&<div style={{fontSize:11,color:BRAND,marginTop:3}}>→ {dateHint}</div>}
-        </Fld>
+        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk} value={tipo} onChange={e=>setTipo(e.target.value)}>{TIPOS_CLEAN.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{(TIPO_EMOJI[v]||"📋")+" "+v}</option>)}</Sel></Fld>
+        <Fld label="Fecha" id="f-fecha"><DatePicker cuando={cuando} deadline={deadline} onChange={(c,d)=>{setCuando(c);setDeadline(d||"");}} dark={dk}/></Fld>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Deadline" id="f-dl"><Inp id="f-dl" dark={dk} type="date" value={deadline} onChange={e=>setDeadline(e.target.value)}/></Fld>
-        <Fld label="Tudú padre" id="f-padre"><Sel id="f-padre" dark={dk}><option>— Ninguno —</option><option>Proyecto Alpha</option></Sel></Fld>
-      </div>
-      <Fld label="Ícono" id="f-icon"><IconPicker value={selIcon} onChange={setSelIcon}/></Fld>
-      <Fld label="Color" id="f-color">
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          {PCOLORS.map((pc,i)=>(
-            <button key={i} type="button" aria-label={"Color "+(i+1)} onClick={()=>setSelColor(i)}
-              style={{width:20,height:20,borderRadius:"50%",cursor:"pointer",background:pc.bg,border:selColor===i?"2px solid #374151":"2px solid transparent"}}/>
-          ))}
-          <input type="color" aria-label="Color personalizado" defaultValue="#FEF08A" style={{width:20,height:20,borderRadius:"50%",border:"none",padding:0,cursor:"pointer"}}/>
-        </div>
-      </Fld>
-      <Fld label="Tamaño" id="f-size">
-        <div style={{display:"flex",gap:6}}>
-          {SIZES.map((sz,i)=>(
-            <button key={sz} type="button" onClick={()=>setSelSize(i)}
-              style={{fontSize:13,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid",
-                background:selSize===i?BRAND:"transparent",color:selSize===i?"#fff":"#9CA3AF",borderColor:selSize===i?BRAND:"#E5E7EB"}}>{sz}</button>
-          ))}
-        </div>
-      </Fld>
       <Fld label="Etiquetas" id="f-tags"><Inp id="f-tags" dark={dk} placeholder="trabajo, urgente... (coma)" value={tags} onChange={e=>setTags(e.target.value)}/></Fld>
-      <Fld label="Contenido" id="f-content"><WysiwygEditor id="f-content" placeholder="Escribí acá..."/></Fld>
+      <Fld label="Contenido" id="f-content">
+        <textarea value={contenido} onChange={e=>setContenido(e.target.value)} placeholder="Notas, descripción..."
+          style={{width:"100%",minHeight:80,fontSize:14,lineHeight:1.7,color:c.text,background:c.surface,border:`1px solid ${c.border}`,borderRadius:8,padding:"8px 12px",fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
+      </Fld>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:14}}>
         <Btn ghost onClick={onClose}>Cancelar</Btn>
         <Btn onClick={handleSubmit}>{saving ? "Guardando..." : action}</Btn>
@@ -369,17 +378,31 @@ function TuduForm({title,action,onClose,onCreated,editTudu,dark:dk}) {
 function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
   const c = th(dk||false);
   const {show:toast,update:toastUpdate} = useGlobalToast();
-  const [editing,setEditing]   = useState(false);
-  const [status,setStatus]     = useState(tudu?.estado||"Por hacer");
-  const [deleting,setDeleting] = useState(false);
-  const [subtasks,setSubtasks] = useState([{id:1,title:"Preparar agenda",done:false},{id:2,title:"Confirmar asistentes",done:true}]);
-  const [newSub,setNewSub]     = useState("");
+
+  // Editable fields
+  const [titulo,setTitulo]     = useState(tudu?.title||"");
+  const [estado,setEstado]     = useState(tudu?.estado||"Por hacer");
+  const [cat,setCat]           = useState(tudu?.categoria||"Inbox");
+  const [tipo,setTipo]         = useState(tudu?.tipo||"Tarea");
+  const [cuando,setCuando]     = useState(tudu?.cuando||"Sin fecha");
+  const [deadline,setDeadline] = useState(tudu?.deadline||"");
+  const [tags,setTags]         = useState(tudu?.etiquetas?.join(", ")||"");
+
+  // Content
   const [bodyText,setBodyText] = useState("");
   const [bodyLoading,setBodyLoading] = useState(true);
   const [bodyEditing,setBodyEditing] = useState(false);
   const [bodyDraft,setBodyDraft]     = useState("");
+
+  // Subtasks & misc
+  const [subtasks,setSubtasks] = useState([{id:1,title:"Preparar agenda",done:false},{id:2,title:"Confirmar asistentes",done:true}]);
+  const [newSub,setNewSub]     = useState("");
+  const [saving,setSaving]     = useState(false);
+  const [deleting,setDeleting] = useState(false);
+
   const titleId = "modal-tudu-detail";
-  const emoji = TIPO_EMOJI[tudu?.tipo]||"📋";
+  const emoji = TIPO_EMOJI[tipo]||"📋";
+  const TIPOS_CLEAN = TUDU_TYPES.map(t=>t.replace(/^.+\s/,""));
 
   useEffect(()=>{
     if(!tudu?.id) return;
@@ -390,51 +413,89 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
       .finally(()=>setBodyLoading(false));
   },[tudu?.id]);
 
-  if(editing) return <TuduForm title="Editar Tudú" action="Guardar" editTudu={tudu} onClose={()=>setEditing(false)} onCreated={()=>{onSaved?.();setEditing(false);}} dark={dk}/>;
-
-  const handleStatusChange=async(newStatus)=>{
-    setStatus(newStatus);
-    try{ await updateTudu(tudu.id,{estado:newStatus}); onSaved?.(); }catch(err){ console.error(err); }
-  };
-
-  const handleDelete=async()=>{
-    setDeleting(true);
-    try{ await deleteTudu(tudu.id); onSaved?.(); onClose(); }catch(err){ console.error(err); setDeleting(false); }
-  };
-
   const addSub = ()=>{
     if(!newSub.trim()) return;
     setSubtasks(p=>[...p,{id:Date.now(),title:newSub.trim(),done:false}]);
     setNewSub("");
   };
 
+  const handleSave=async()=>{
+    setSaving(true);
+    const tid=toast("Guardando...","loading");
+    try{
+      const data: any = {
+        title:titulo.trim()||tudu?.title, tipo, categoria:cat, estado, cuando,
+        deadline:deadline||null,
+        etiquetas:tags.split(",").map(t=>t.trim()).filter(Boolean),
+      };
+      const promises: Promise<any>[] = [updateTudu(tudu.id,data)];
+      const contentChanged = bodyDraft!==bodyText;
+      if(contentChanged) promises.push(updatePageContent(tudu.id,bodyDraft));
+      await Promise.all(promises);
+      toastUpdate(tid,"✓ Guardado","success");
+      onSaved?.();
+      onClose();
+    }catch(err){
+      console.error(err);
+      toastUpdate(tid,"✗ Error al guardar","error");
+      setSaving(false);
+    }
+  };
+
+  const handleDelete=()=>{
+    if(!confirm("¿Eliminar este tudú?")) return;
+    setDeleting(true);
+    const tid=toast("Eliminando...","loading");
+    deleteTudu(tudu.id)
+      .then(()=>{ toastUpdate(tid,"✓ Eliminado","success"); onSaved?.(); onClose(); })
+      .catch(err=>{ console.error(err); toastUpdate(tid,"✗ Error al eliminar","error"); setDeleting(false); });
+  };
+
   return (
     <Overlay onClose={onClose} dark={dk} titleId={titleId}>
-      <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:12}}>
-        <span style={{fontSize:18}}>{emoji}</span>
-        <div style={{flex:1}}>
-          <h2 id={titleId} style={{fontSize:14,fontWeight:500,color:c.text,margin:0}}>{tudu?.title||"Sin título"}</h2>
-          <div style={{fontSize:13,color:c.textFaint,marginTop:2}}>{tudu?.categoria} · {tudu?.tipo}</div>
-        </div>
-        <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:c.textFaint}}>✕</button>
+      {/* Header: emoji + título editable + cerrar */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+        <span style={{fontSize:20,flexShrink:0,cursor:"default"}} title={tipo}>{emoji}</span>
+        <input id={titleId} value={titulo} onChange={e=>setTitulo(e.target.value)}
+          style={{flex:1,fontSize:15,fontWeight:500,color:c.text,background:"transparent",border:"none",outline:"none",fontFamily:"inherit",padding:0}}
+          placeholder="Título del tudú"/>
+        <button type="button" aria-label="Cerrar" onClick={onClose} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:c.textFaint,flexShrink:0}}>✕</button>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:12}}>
-        <div style={{background:c.surface2,borderRadius:8,padding:"7px 10px",border:`1px solid ${c.border}`}}>
-          <label htmlFor="det-status" style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3,display:"block"}}>Estado</label>
-          <select id="det-status" value={status} onChange={e=>handleStatusChange(e.target.value)}
-            style={{border:"none",background:"transparent",padding:0,fontSize:14,color:c.text,cursor:"pointer",width:"100%",outline:"none"}}>
+      {/* Row 1: Estado | Categoría */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Estado</div>
+          <select value={estado} onChange={e=>setEstado(e.target.value)}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>
             {ESTADOS_DEFAULT.map(s=><option key={s} style={{background:c.surface,color:c.text}}>{s}</option>)}
           </select>
         </div>
-        {[["Cuándo",tudu?.cuando||"Sin fecha"],["Tipo",`${emoji} ${tudu?.tipo}`],["Tamaño",tudu?.tamano||"M"]].map(([l,v])=>(
-          <div key={l} style={{background:c.surface2,borderRadius:8,padding:"7px 10px",border:`1px solid ${c.border}`}}>
-            <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>{l}</div>
-            <div style={{fontSize:14,color:c.text}}>{v}</div>
-          </div>
-        ))}
+        <div>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Categoría</div>
+          <select value={cat} onChange={e=>setCat(e.target.value)}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>
+            {CATEGORIAS_NAMES.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
+          </select>
+        </div>
       </div>
 
+      {/* Row 2: Tipo | Fecha */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        <div>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Tipo</div>
+          <select value={tipo} onChange={e=>setTipo(e.target.value)}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>
+            {TIPOS_CLEAN.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{(TIPO_EMOJI[v]||"📋")+" "+v}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Fecha</div>
+          <DatePicker cuando={cuando} deadline={deadline} onChange={(cu,dl)=>{setCuando(cu);setDeadline(dl||"");}} dark={dk}/>
+        </div>
+      </div>
+
+      {/* Contenido */}
       <div style={{marginBottom:12}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
           <div style={{fontSize:11,fontWeight:500,color:c.textFaint,textTransform:"uppercase",letterSpacing:".4px"}}>Contenido</div>
@@ -446,27 +507,11 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         {bodyLoading?(
           <div style={{background:c.surface2,borderRadius:8,padding:12,border:`1px solid ${c.border}`,fontSize:13,color:c.textFaint}}>Cargando...</div>
         ):bodyEditing?(
-          <div>
-            <textarea value={bodyDraft} onChange={e=>setBodyDraft(e.target.value)}
-              style={{width:"100%",minHeight:100,fontSize:14,lineHeight:1.7,color:c.text,background:c.surface2,border:`1px solid ${BRAND}`,borderRadius:8,padding:12,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
-            <div style={{display:"flex",gap:6,marginTop:6}}>
-              <Btn sm onClick={()=>{
-                const contentChanged = bodyDraft !== bodyText;
-                if(!contentChanged){ setBodyEditing(false); return; }
-                const draft=bodyDraft;
-                onClose();
-                const tid=toast("Guardando...","loading");
-                const promises: Promise<any>[] = [updatePageContent(tudu.id,draft)];
-                if(tudu.contenido!==draft) promises.push(updateTudu(tudu.id,{contenido:draft.slice(0,2000)}));
-                Promise.all(promises)
-                  .then(()=>{ toastUpdate(tid,"✓ Guardado","success"); onSaved?.(); })
-                  .catch(()=>{ toastUpdate(tid,"✗ Error al guardar","error"); });
-              }}>Guardar</Btn>
-              <Btn sm ghost onClick={()=>{setBodyDraft(bodyText);setBodyEditing(false);}}>Cancelar</Btn>
-            </div>
-          </div>
+          <textarea value={bodyDraft} onChange={e=>setBodyDraft(e.target.value)}
+            style={{width:"100%",minHeight:80,fontSize:14,lineHeight:1.7,color:c.text,background:c.surface2,border:`1px solid ${BRAND}`,borderRadius:8,padding:12,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
         ):bodyText?(
-          <div style={{background:c.surface2,borderRadius:8,padding:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`,whiteSpace:"pre-wrap"}}>
+          <div style={{background:c.surface2,borderRadius:8,padding:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`,whiteSpace:"pre-wrap",cursor:"pointer"}}
+            onClick={()=>{setBodyDraft(bodyText);setBodyEditing(true);}}>
             {bodyText}
           </div>
         ):(
@@ -477,6 +522,7 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         )}
       </div>
 
+      {/* Subtareas */}
       <div style={{marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:500,color:c.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:".4px"}}>Subtareas</div>
         {subtasks.length>0&&(
@@ -502,8 +548,9 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         </div>
       </div>
 
+      {/* Pomodoro */}
       <button type="button" onClick={()=>{onClose();onPomo();}}
-        style={{display:"flex",alignItems:"center",gap:8,background:c.surface2,borderRadius:8,padding:"8px 12px",cursor:"pointer",border:`1px solid ${c.border}`,width:"100%",textAlign:"left",marginBottom:10,fontFamily:"inherit"}}>
+        style={{display:"flex",alignItems:"center",gap:8,background:c.surface2,borderRadius:8,padding:"8px 12px",cursor:"pointer",border:`1px solid ${c.border}`,width:"100%",textAlign:"left",marginBottom:14,fontFamily:"inherit"}}>
         <div style={{width:28,height:28,borderRadius:"50%",background:"#FEE2E2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>⏱</div>
         <div style={{flex:1}}>
           <div style={{fontSize:14,fontWeight:500,color:c.text}}>Iniciar Pomodoro</div>
@@ -512,12 +559,15 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         <span style={{color:c.border}}>›</span>
       </button>
 
-      <div style={{display:"flex",gap:8}}>
-        <Btn onClick={()=>setEditing(true)} style={{flex:1}}>✎ Editar Tudú completo</Btn>
+      {/* Footer: Eliminar | Cancelar | Guardar */}
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button type="button" onClick={handleDelete} disabled={deleting}
-          style={{padding:"8px 16px",borderRadius:8,border:"1px solid #FCA5A5",background:"transparent",color:"#DC2626",cursor:"pointer",fontSize:14,fontFamily:"inherit",opacity:deleting?0.5:1}}>
+          style={{padding:"6px 14px",borderRadius:8,border:"1px solid #FCA5A5",background:"transparent",color:"#DC2626",cursor:"pointer",fontSize:13,fontFamily:"inherit",opacity:deleting?0.5:1}}>
           {deleting?"Eliminando...":"🗑 Eliminar"}
         </button>
+        <div style={{flex:1}}/>
+        <Btn ghost onClick={onClose}>Cancelar</Btn>
+        <Btn onClick={handleSave}>{saving?"Guardando...":"Guardar"}</Btn>
       </div>
     </Overlay>
   );
@@ -1510,12 +1560,11 @@ export default function App() {
       {/* FAB */}
       <button type="button" aria-label="Crear nuevo Tudú" onClick={()=>setShowNew(true)}
         style={{position:"fixed",bottom:isMobile?66:18,right:18,width:46,height:46,borderRadius:"50%",background:BRAND,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:40,boxShadow:"0 4px 12px rgba(117,176,228,0.5)",border:"none"}}>
-        <img src="https://i.imgur.com/CSTzdkj.png" style={{width:24,height:24,objectFit:"contain"}} alt=""
-          onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
-        <span style={{display:"none",color:"#fff",fontSize:22,fontWeight:300}}>+</span>
+        <span style={{color:"#fff",fontSize:28,fontWeight:300,lineHeight:1}}>+</span>
       </button>
 
-      {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} onCreated={refresh} dark={dark}/>}
+      {showNew  && <TuduForm   title="Nuevo Tudú" action="Crear Tudú" onClose={()=>setShowNew(false)} onCreated={refresh} dark={dark}
+        defaultCat={(screen==="category"||screen==="canvas")?selectedCat:screen==="inbox"?"Inbox":undefined}/>}
       {showTudu && <TuduDetail tudu={selectedTudu} onClose={()=>{setShowTudu(false);setSelectedTudu(null);}} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} onSaved={refresh} dark={dark}/>}
       {showPomo && <PomoWidget onClose={()=>setShowPomo(false)} onOpenTask={()=>setShowTudu(true)} isMobile={isMobile} dark={dark}/>}
     </div>
