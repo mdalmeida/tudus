@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
-import { getTudus, createTudu, updateTudu, deleteTudu, type Tudu } from "./notion";
+import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, type Tudu } from "./notion";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray, ArrowsClockwise } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
@@ -346,8 +346,22 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
   const [deleting,setDeleting] = useState(false);
   const [subtasks,setSubtasks] = useState([{id:1,title:"Preparar agenda",done:false},{id:2,title:"Confirmar asistentes",done:true}]);
   const [newSub,setNewSub]     = useState("");
+  const [bodyText,setBodyText] = useState("");
+  const [bodyLoading,setBodyLoading] = useState(true);
+  const [bodyEditing,setBodyEditing] = useState(false);
+  const [bodySaving,setBodySaving]   = useState(false);
+  const [bodyDraft,setBodyDraft]     = useState("");
   const titleId = "modal-tudu-detail";
   const emoji = TIPO_EMOJI[tudu?.tipo]||"📋";
+
+  useEffect(()=>{
+    if(!tudu?.id) return;
+    setBodyLoading(true);
+    getPageContent(tudu.id)
+      .then(txt=>{setBodyText(txt);setBodyDraft(txt);})
+      .catch(err=>console.error("Error cargando contenido:",err))
+      .finally(()=>setBodyLoading(false));
+  },[tudu?.id]);
 
   if(editing) return <TuduForm title="Editar Tudú" action="Guardar" editTudu={tudu} onClose={()=>setEditing(false)} onCreated={()=>{onSaved?.();setEditing(false);}} dark={dk}/>;
 
@@ -394,11 +408,41 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         ))}
       </div>
 
-      {tudu?.contenido&&(
-        <div style={{background:c.surface2,borderRadius:8,padding:12,marginBottom:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`}}>
-          {tudu.contenido}
+      <div style={{marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+          <div style={{fontSize:11,fontWeight:500,color:c.textFaint,textTransform:"uppercase",letterSpacing:".4px"}}>Contenido</div>
+          {!bodyEditing&&!bodyLoading&&(
+            <button type="button" onClick={()=>{setBodyDraft(bodyText);setBodyEditing(true);}}
+              style={{fontSize:12,color:BRAND,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0}}>Editar</button>
+          )}
         </div>
-      )}
+        {bodyLoading?(
+          <div style={{background:c.surface2,borderRadius:8,padding:12,border:`1px solid ${c.border}`,fontSize:13,color:c.textFaint}}>Cargando...</div>
+        ):bodyEditing?(
+          <div>
+            <textarea value={bodyDraft} onChange={e=>setBodyDraft(e.target.value)}
+              style={{width:"100%",minHeight:100,fontSize:14,lineHeight:1.7,color:c.text,background:c.surface2,border:`1px solid ${BRAND}`,borderRadius:8,padding:12,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
+            <div style={{display:"flex",gap:6,marginTop:6}}>
+              <Btn sm onClick={async()=>{
+                setBodySaving(true);
+                try{ await updatePageContent(tudu.id,bodyDraft); setBodyText(bodyDraft); setBodyEditing(false); onSaved?.(); }
+                catch(err){ console.error(err); }
+                finally{ setBodySaving(false); }
+              }}>{bodySaving?"Guardando...":"Guardar"}</Btn>
+              <Btn sm ghost onClick={()=>{setBodyDraft(bodyText);setBodyEditing(false);}}>Cancelar</Btn>
+            </div>
+          </div>
+        ):bodyText?(
+          <div style={{background:c.surface2,borderRadius:8,padding:12,fontSize:14,lineHeight:1.7,color:c.textMuted,border:`1px solid ${c.border}`,whiteSpace:"pre-wrap"}}>
+            {bodyText}
+          </div>
+        ):(
+          <div style={{background:c.surface2,borderRadius:8,padding:12,border:`1px dashed ${c.border}`,fontSize:13,color:c.textFaint,textAlign:"center",cursor:"pointer"}}
+            onClick={()=>{setBodyDraft("");setBodyEditing(true);}}>
+            Sin contenido — click para agregar
+          </div>
+        )}
+      </div>
 
       <div style={{marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:500,color:c.textFaint,marginBottom:6,textTransform:"uppercase",letterSpacing:".4px"}}>Subtareas</div>
@@ -1030,7 +1074,10 @@ function CanvasView({tudus=[],loading,onNew,onTudu,dark:dk,isMobile}) {
 function ConfigView({dark:dk,onToggle}) {
   const c = th(dk||false);
   const [cats,setCats]       = useState(CATS_INIT);
-  const [estados,setEstados] = useState(ESTADOS_DEFAULT);
+  const [estados,setEstados] = useState(()=>{
+    try{ const s=localStorage.getItem("tudus_estados"); return s?JSON.parse(s):ESTADOS_DEFAULT; }catch{ return ESTADOS_DEFAULT; }
+  });
+  useEffect(()=>{ try{ localStorage.setItem("tudus_estados",JSON.stringify(estados)); }catch{} },[estados]);
   const [editCat,setEditCat] = useState(null);
   const [newEstado,setNewEstado] = useState("");
   const [section,setSection] = useState("appearance");
@@ -1150,13 +1197,15 @@ function ConfigView({dark:dk,onToggle}) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
+function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats,selectedCat,onCatSelect,tudus=[]}) {
   const c = th(dk||false);
   const [catsOpen,setCatsOpen] = useState(true);
-  const Item=({iconName,label,id,badge,sub})=>{
-    const active=screen===id;
+  const catCounts: Record<string,number> = {};
+  tudus.forEach((t: any)=>{ const cat=t.categoria||"Inbox"; catCounts[cat]=(catCounts[cat]||0)+1; });
+  const Item=({iconName,label,id,badge,sub,catName})=>{
+    const active = catName ? (screen==="category"&&selectedCat===catName) : screen===id;
     return (
-      <button type="button" onClick={()=>onNav(id)} aria-label={label}
+      <button type="button" onClick={()=>{ if(catName){onCatSelect(catName);onNav("category");}else{onNav(id);} }} aria-label={label}
         style={{display:"flex",alignItems:"center",justifyContent:collapsed?"center":"flex-start",gap:6,width:"calc(100% - 8px)",padding:collapsed?"10px 0":`8px ${sub?32:12}px`,fontSize:14,cursor:"pointer",borderRadius:6,margin:"1px 4px",background:active?"rgba(117,176,228,0.12)":"transparent",color:active?BRAND:c.textMuted,fontWeight:active?500:400,border:"none",fontFamily:"inherit",textAlign:"left"}}>
         <Icon name={iconName} size={15} color={active?BRAND:c.textMuted}/>
         {!collapsed&&<>
@@ -1174,8 +1223,8 @@ function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
       </button>
       <div style={{flex:1,overflowY:"auto",padding:"6px 0",display:"flex",flexDirection:"column"}}>
         <Item iconName="Star"     label="Dashboard" id="dashboard"/>
-        <Item iconName="GridFour" label="Todas"     id="all"   badge={28}/>
-        <Item iconName="Tray"     label="Inbox"     id="inbox" badge={3}/>
+        <Item iconName="GridFour" label="Todas"     id="all"   badge={tudus.length}/>
+        <Item iconName="Tray"     label="Inbox"     id="inbox" badge={catCounts["Inbox"]||0}/>
         {!collapsed&&<div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".5px",color:c.textFaint,padding:"8px 14px 2px"}}>Categorías</div>}
         {!collapsed&&(
           <button type="button" onClick={()=>setCatsOpen(o=>!o)} aria-expanded={catsOpen}
@@ -1183,8 +1232,8 @@ function Sidebar({screen,onNav,collapsed,onToggle,dark:dk,cats}) {
             <span>{catsOpen?"▾":"▸"}</span><span style={{color:c.text}}>Categorías</span>
           </button>
         )}
-        {collapsed&&cats.map(cat=><Item key={cat.id} iconName={cat.icon} label={cat.name} id="category"/>)}
-        {!collapsed&&catsOpen&&cats.map(cat=><Item key={cat.id} iconName={cat.icon} label={cat.name} id="category" badge={cat.badge} sub/>)}
+        {collapsed&&cats.map(cat=><Item key={cat.id} iconName={cat.icon} label={cat.name} id="category" catName={cat.name}/>)}
+        {!collapsed&&catsOpen&&cats.map(cat=><Item key={cat.id} iconName={cat.icon} label={cat.name} id="category" badge={catCounts[cat.name]||0} sub catName={cat.name}/>)}
         <div style={{flex:1}}/>
         <div style={{borderTop:`1px solid ${c.border}`,paddingTop:4}}>
           <Item iconName="Gear"    label="Configuración" id="config"/>
@@ -1224,6 +1273,7 @@ export default function App() {
   const [refreshKey,setRefreshKey] = useState(0);
   const [searchExp,setSearchExp] = useState(false);
   const [cats]                   = useState(CATS_INIT);
+  const [selectedCat,setSelectedCat] = useState("My Work");
   const [allTudus,setAllTudus]   = useState<any[]>([]);
   const [tudusLoading,setTudusLoading] = useState(true);
   const isMobile                 = useIsMobile();
@@ -1279,6 +1329,10 @@ export default function App() {
         </div>
 
         <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:"auto"}}>
+          <button type="button" aria-label="Recargar tudús" onClick={refresh}
+            style={{display:"flex",alignItems:"center",justifyContent:"center",width:30,height:30,borderRadius:6,border:`1px solid ${c.border}`,background:"transparent",cursor:"pointer",color:c.textMuted}}>
+            <ArrowsClockwise size={16}/>
+          </button>
           <button type="button" aria-label={"Modo "+(dark?"claro":"oscuro")} aria-pressed={dark} onClick={()=>setDark(d=>!d)}
             style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:6,border:`1px solid ${c.border}`,background:"transparent",cursor:"pointer",fontSize:13,color:c.textMuted,fontFamily:"inherit"}}>
             <span>{dark?"☽":"☀"}</span>{!isMobile&&<span>{dark?"Oscuro":"Claro"}</span>}
@@ -1289,13 +1343,13 @@ export default function App() {
 
       {/* BODY */}
       <div style={{display:"flex",flex:1,overflow:"hidden"}}>
-        {!isMobile&&<Sidebar screen={screen} onNav={setScreen} collapsed={collapsed} onToggle={()=>setCollapsed(s=>!s)} dark={dark} cats={cats}/>}
+        {!isMobile&&<Sidebar screen={screen} onNav={setScreen} collapsed={collapsed} onToggle={()=>setCollapsed(s=>!s)} dark={dark} cats={cats} selectedCat={selectedCat} onCatSelect={setSelectedCat} tudus={allTudus}/>}
         <div style={{flex:1,overflowY:"auto",padding:isMobile?"12px":"16px",paddingBottom:isMobile?72:16,background:c.bg}}>
           {screen==="dashboard" && <Dashboard key={refreshKey} tudus={allTudus} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} onRefresh={refresh} dark={dark} isMobile={isMobile}/>}
           {screen==="all"       && <ListView title="Todos los tudús" tudus={allTudus} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
           {screen==="inbox"     && <ListView title="Inbox" tudus={allTudus.filter(t=>t.categoria==="Inbox")} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
-          {screen==="category"  && <CategoryView tudus={allTudus.filter(t=>t.categoria==="My Work")} onView={()=>setScreen("canvas")} onTudu={openTudu}/>}
-          {screen==="canvas"    && <CanvasView tudus={allTudus.filter(t=>t.categoria==="My Work")} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} dark={dark} isMobile={isMobile}/>}
+          {screen==="category"  && <CategoryView tudus={allTudus.filter(t=>t.categoria===selectedCat)} onView={()=>setScreen("canvas")} onTudu={openTudu}/>}
+          {screen==="canvas"    && <CanvasView tudus={allTudus.filter(t=>t.categoria===selectedCat)} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} dark={dark} isMobile={isMobile}/>}
           {screen==="config"    && <ConfigView dark={dark} onToggle={()=>setDark(d=>!d)}/>}
         </div>
       </div>

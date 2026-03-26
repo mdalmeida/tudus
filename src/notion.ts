@@ -113,3 +113,54 @@ export async function updateTudu(id: string, data: Partial<Omit<Tudu, "id">>): P
 export async function deleteTudu(id: string): Promise<Tudu> {
   return updateTudu(id, { eliminado: true });
 }
+
+// ── Page content (blocks) ────────────────────────────────────────────────────
+
+function blocksToText(blocks: any[]): string {
+  return blocks
+    .map((b) => {
+      const type = b.type;
+      const rt = b[type]?.rich_text;
+      if (!rt) return "";
+      return rt.map((t: any) => t.plain_text).join("");
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function textToBlocks(text: string): any[] {
+  return text.split("\n").map((line) => ({
+    object: "block",
+    type: "paragraph",
+    paragraph: {
+      rich_text: [{ type: "text", text: { content: line } }],
+    },
+  }));
+}
+
+export async function getPageContent(pageId: string): Promise<string> {
+  const blocks: any[] = [];
+  let cursor: string | undefined;
+  do {
+    const qs = cursor ? `?start_cursor=${cursor}` : "";
+    const data = await notionFetch(`/blocks/${pageId}/children${qs}`, "GET");
+    blocks.push(...data.results);
+    cursor = data.has_more ? data.next_cursor : undefined;
+  } while (cursor);
+  return blocksToText(blocks);
+}
+
+export async function updatePageContent(pageId: string, text: string): Promise<void> {
+  // 1. Fetch existing blocks
+  const existing = await notionFetch(`/blocks/${pageId}/children`, "GET");
+  // 2. Delete each old block
+  for (const block of existing.results) {
+    await notionFetch(`/blocks/${block.id}`, "DELETE");
+  }
+  // 3. Append new blocks
+  if (text.trim()) {
+    await notionFetch(`/blocks/${pageId}/children`, "PATCH", {
+      children: textToBlocks(text),
+    });
+  }
+}
