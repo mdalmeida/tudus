@@ -52,7 +52,15 @@ function tuduToRow(data: Partial<Omit<Tudu, "id">>): Record<string, any> {
   if (data.categoria !== undefined) row.categoria = data.categoria;
   if (data.estado !== undefined) row.estado = data.estado;
   if (data.cuando !== undefined) row.cuando = data.cuando;
-  if (data.deadline !== undefined) row.deadline = data.deadline;
+  if (data.deadline !== undefined) {
+    if (data.deadline) {
+      // Normalize to ISO YYYY-MM-DD — handles dd/mm/yyyy, locale strings, etc.
+      const d = new Date(data.deadline);
+      row.deadline = !isNaN(d.getTime()) ? d.toISOString().split("T")[0] : data.deadline;
+    } else {
+      row.deadline = null;
+    }
+  }
   if (data.color !== undefined) row.color = data.color;
   if (data.tamano !== undefined) row.tamano = data.tamano;
   if (data.etiquetas !== undefined) row.etiquetas = data.etiquetas;

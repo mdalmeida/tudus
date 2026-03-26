@@ -10,14 +10,16 @@ const ESTADOS_DEFAULT = ["Por hacer","Empezada","En curso","Terminando","Esperan
 const CATEGORIAS_NAMES = ["My Work","Setup Base","House & Car","Financial","Family","Social & Experiences","Skills","Health","Mindset","Inbox"];
 const CUANDO = ["Sin fecha","Hoy","Mañana","Esta semana","Próxima semana","Este mes","Algún día"];
 
+const toISO = (d: Date) => d.toISOString().split("T")[0];
+const toLocal = (iso: string) => { const [y,m,dd]=iso.split("-"); return `${+dd}/${+m}/${y}`; };
 const calcDate = (c) => {
   const d = new Date();
-  if(c==="Hoy") return d.toLocaleDateString("es-AR");
-  if(c==="Mañana"){d.setDate(d.getDate()+1);return d.toLocaleDateString("es-AR");}
-  if(c==="Esta semana"){d.setDate(d.getDate()+7);return d.toLocaleDateString("es-AR");}
-  if(c==="Próxima semana"){d.setDate(d.getDate()+14);return d.toLocaleDateString("es-AR");}
-  if(c==="Este mes"){d.setMonth(d.getMonth()+1);return d.toLocaleDateString("es-AR");}
-  if(c==="Algún día"){d.setMonth(d.getMonth()+3);return d.toLocaleDateString("es-AR");}
+  if(c==="Hoy") return toISO(d);
+  if(c==="Mañana"){d.setDate(d.getDate()+1);return toISO(d);}
+  if(c==="Esta semana"){d.setDate(d.getDate()+7);return toISO(d);}
+  if(c==="Próxima semana"){d.setDate(d.getDate()+14);return toISO(d);}
+  if(c==="Este mes"){d.setMonth(d.getMonth()+1);return toISO(d);}
+  if(c==="Algún día"){d.setMonth(d.getMonth()+3);return toISO(d);}
   return null;
 };
 
@@ -273,9 +275,17 @@ function DatePicker({cuando,deadline,onChange,dark:dk}) {
   const [open,setOpen] = useState(false);
   const [tmpCuando,setTmpCuando] = useState(cuando||"Sin fecha");
   const [tmpDate,setTmpDate] = useState(deadline||"");
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [rect,setRect] = useState<{top:number,left:number,width:number}|null>(null);
   const isExact = tmpCuando==="Fecha exacta";
   const hint = !isExact && tmpCuando!=="Sin fecha" ? calcDate(tmpCuando) : null;
-  const display = cuando==="Fecha exacta" ? (deadline||"Elegir fecha") : cuando==="Sin fecha" ? "Sin fecha" : `${cuando}${deadline?" · "+deadline:""}`;
+  const fmtDl = (dl:string) => { if(!dl) return ""; try{ return toLocal(dl); }catch{ return dl; } };
+  const display = cuando==="Fecha exacta" ? (deadline?fmtDl(deadline):"Elegir fecha") : cuando==="Sin fecha" ? "Sin fecha" : `${cuando}${deadline?" · "+fmtDl(deadline):""}`;
+  const toggle=()=>{
+    setTmpCuando(cuando||"Sin fecha");setTmpDate(deadline||"");
+    if(!open&&btnRef.current){const r=btnRef.current.getBoundingClientRect();setRect({top:r.bottom+4,left:r.left,width:r.width});}
+    setOpen(!open);
+  };
   const save=()=>{
     const dl = isExact ? tmpDate : calcDate(tmpCuando)||null;
     onChange(tmpCuando==="Fecha exacta"?"Sin fecha":tmpCuando, dl||null);
@@ -284,19 +294,19 @@ function DatePicker({cuando,deadline,onChange,dark:dk}) {
   const clear=()=>{ onChange("Sin fecha",null); setOpen(false); };
   return (
     <div style={{position:"relative"}}>
-      <button type="button" onClick={()=>{setTmpCuando(cuando||"Sin fecha");setTmpDate(deadline||"");setOpen(!open);}}
+      <button ref={btnRef} type="button" onClick={toggle}
         style={{width:"100%",padding:"8px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:8,background:c.surface,color:c.text,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
         {display}
       </button>
-      {open&&(
-        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:60,marginTop:4,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
+      {open&&rect&&(
+        <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:rect.top,left:rect.left,width:rect.width,zIndex:9998,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
           <select value={tmpCuando} onChange={e=>{setTmpCuando(e.target.value);if(e.target.value!=="Fecha exacta")setTmpDate("");}}
             style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}>
             {[...CUANDO,"Fecha exacta"].map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
           </select>
           {isExact&&<input type="date" value={tmpDate} onChange={e=>setTmpDate(e.target.value)}
             style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}/>}
-          {hint&&<div style={{fontSize:12,color:BRAND,marginBottom:8}}>→ {hint}</div>}
+          {hint&&<div style={{fontSize:12,color:BRAND,marginBottom:8}}>→ {toLocal(hint)}</div>}
           <div style={{display:"flex",gap:6,justifyContent:"space-between"}}>
             <button type="button" onClick={clear} style={{fontSize:12,color:c.textFaint,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0}}>Sin fecha</button>
             <div style={{display:"flex",gap:6}}>
@@ -974,7 +984,12 @@ function CategoryView({tudus=[],onView,onTudu}) {
 }
 
 // ── PostitsView ───────────────────────────────────────────────────────────────
-function PostitsView({tudus=[],onTudu,dark:dk}) {
+const POSTIT_COLORS = ["#FEF08A","#E9D5FF","#BAE6FD","#BBF7D0","#FED7AA","#CCFBF1","#FCA5A5","#FECDD3","#DDD6FE","#A7F3D0"];
+const POSTIT_TX: Record<string,string> = {"#FEF08A":"#713F12","#E9D5FF":"#4C1D95","#BAE6FD":"#0C4C5C","#BBF7D0":"#14532D","#FED7AA":"#7C2D12","#CCFBF1":"#134E4A","#FCA5A5":"#7F1D1D","#FECDD3":"#881337","#DDD6FE":"#4C1D95","#A7F3D0":"#064E3B"};
+const TAMANOS = ["XS","S","M","L","XL"];
+const TAMANO_SIZE: Record<string,{w:number,h:number}> = {"XS":{w:100,h:70},"S":{w:115,h:82},"M":{w:130,h:95},"L":{w:160,h:115},"XL":{w:190,h:135}};
+
+function PostitsView({tudus=[],onTudu,onRefresh,dark:dk}) {
   const c = th(dk||false);
   const {show:toast,update:toastUpdate} = useGlobalToast();
   const [pos,setPos] = useState<Record<string,{x:number,y:number}>>({});
@@ -982,6 +997,13 @@ function PostitsView({tudus=[],onTudu,dark:dk}) {
   const moved = useRef(false);
   const areaRef = useRef<HTMLDivElement|null>(null);
   const saveTimer = useRef<Record<string,ReturnType<typeof setTimeout>>>({});
+  const clickTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const [editId,setEditId] = useState<string|null>(null);
+  const [editColor,setEditColor] = useState("");
+  const [editTamano,setEditTamano] = useState("M");
+  const [editIcon,setEditIcon] = useState("CheckSquare");
+  const [editRect,setEditRect] = useState<{top:number,left:number}|null>(null);
+  const [editSaving,setEditSaving] = useState(false);
 
   useEffect(()=>{
     setPos(prev=>{
@@ -1022,8 +1044,12 @@ function PostitsView({tudus=[],onTudu,dark:dk}) {
   };
   const onMU=(id:string)=>{
     if(!moved.current&&id){
-      const t=tudus.find((t:any)=>t.id===id);
-      if(t) onTudu(t);
+      // Single click → open detail (with delay to allow dblclick)
+      if(clickTimer.current) clearTimeout(clickTimer.current);
+      clickTimer.current=setTimeout(()=>{
+        const t=tudus.find((t:any)=>t.id===id);
+        if(t) onTudu(t);
+      },250);
     } else if(moved.current&&drag.current){
       const mid=drag.current.id;
       const p=pos[mid];
@@ -1032,17 +1058,51 @@ function PostitsView({tudus=[],onTudu,dark:dk}) {
     drag.current=null;moved.current=false;
   };
 
+  const onDblClick=(e:React.MouseEvent,t:any)=>{
+    if(clickTimer.current) clearTimeout(clickTimer.current);
+    e.stopPropagation();
+    const r=(e.currentTarget as HTMLElement).getBoundingClientRect();
+    setEditId(t.id);
+    setEditColor(t.color||"");
+    setEditTamano(t.tamano||"M");
+    setEditIcon(t.color?"CheckSquare":"CheckSquare"); // icon not stored yet, default
+    setEditRect({top:r.top,left:r.right+8});
+  };
+
+  const saveEdit=async()=>{
+    if(!editId) return;
+    setEditSaving(true);
+    const tid=toast("Guardando estilo...","loading");
+    try{
+      await updateTudu(editId,{color:editColor,tamano:editTamano} as any);
+      toastUpdate(tid,"✓ Estilo guardado","success");
+      onRefresh?.();
+      setEditId(null);
+    }catch(err){
+      console.error(err);
+      toastUpdate(tid,"✗ Error al guardar","error");
+    }finally{ setEditSaving(false); }
+  };
+
+  const getPostColor=(t:any,i:number)=>{
+    if(t.color && POSTIT_TX[t.color]) return {bg:t.color,tx:POSTIT_TX[t.color]};
+    return PCOLORS[i%PCOLORS.length];
+  };
+  const getPostSize=(t:any)=> TAMANO_SIZE[t.tamano]||TAMANO_SIZE["M"];
+
   return (
+    <>
     <div ref={areaRef} onMouseMove={onMM} onMouseUp={()=>{if(drag.current&&moved.current){const mid=drag.current.id;const p=pos[mid];if(p)persistPos(mid,p.x,p.y);}drag.current=null;moved.current=false;}}
       style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:12,height:360,position:"relative",overflow:"hidden",backgroundImage:`radial-gradient(circle,${c.border} 1px,transparent 1px)`,backgroundSize:"20px 20px"}}>
       {tudus.length===0&&<p style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:14,color:c.textFaint}}>Sin tudús en esta categoría</p>}
       {tudus.map((t:any,i:number)=>{
         const p=pos[t.id];if(!p) return null;
-        const pc=PCOLORS[i%PCOLORS.length];
+        const pc=getPostColor(t,i);
+        const sz=getPostSize(t);
         const emoji=TIPO_EMOJI[t.tipo]||"📋";
         return (
-          <div key={t.id} onMouseDown={e=>onMD(e,t.id)} onMouseUp={()=>onMU(t.id)}
-            style={{position:"absolute",left:p.x,top:p.y,width:130,height:95,background:pc.bg,color:pc.tx,borderRadius:8,padding:"8px 10px",fontSize:13,userSelect:"none",cursor:drag.current?.id===t.id?"grabbing":"grab",boxShadow:"2px 3px 8px rgba(0,0,0,0.18)",zIndex:drag.current?.id===t.id?50:1,overflow:"hidden"}}>
+          <div key={t.id} onMouseDown={e=>onMD(e,t.id)} onMouseUp={()=>onMU(t.id)} onDoubleClick={e=>onDblClick(e,t)}
+            style={{position:"absolute",left:p.x,top:p.y,width:sz.w,height:sz.h,background:pc.bg,color:pc.tx,borderRadius:8,padding:"8px 10px",fontSize:13,userSelect:"none",cursor:drag.current?.id===t.id?"grabbing":"grab",boxShadow:"2px 3px 8px rgba(0,0,0,0.18)",zIndex:drag.current?.id===t.id?50:editId===t.id?49:1,overflow:"hidden",outline:editId===t.id?`2px solid ${BRAND}`:"none"}}>
             <div style={{fontSize:11,opacity:.75,marginBottom:2,pointerEvents:"none"}}>{emoji} {t.tipo}</div>
             <div style={{fontWeight:500,lineHeight:1.3,pointerEvents:"none"}}>{t.title}</div>
             <div style={{fontSize:11,opacity:.6,marginTop:3,pointerEvents:"none"}}>{t.cuando||"Sin fecha"}</div>
@@ -1050,6 +1110,43 @@ function PostitsView({tudus=[],onTudu,dark:dk}) {
         );
       })}
     </div>
+    {/* Mini edit panel (fixed, above everything) */}
+    {editId&&editRect&&(
+      <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:editRect.top,left:editRect.left,zIndex:9998,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:14,width:220,boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <span style={{fontSize:12,fontWeight:600,color:c.text}}>Personalizar</span>
+          <button type="button" onClick={()=>setEditId(null)} style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:14}}>✕</button>
+        </div>
+        {/* Color */}
+        <div style={{fontSize:11,color:c.textFaint,marginBottom:4,textTransform:"uppercase",letterSpacing:".4px"}}>Color</div>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
+          {POSTIT_COLORS.map(clr=>(
+            <button key={clr} type="button" onClick={()=>setEditColor(clr)}
+              style={{width:24,height:24,borderRadius:6,background:clr,border:editColor===clr?`2px solid ${BRAND}`:"2px solid transparent",cursor:"pointer",outline:"none"}}/>
+          ))}
+        </div>
+        {/* Tamaño */}
+        <div style={{fontSize:11,color:c.textFaint,marginBottom:4,textTransform:"uppercase",letterSpacing:".4px"}}>Tamaño</div>
+        <div style={{display:"flex",gap:4,marginBottom:10}}>
+          {TAMANOS.map(sz=>(
+            <button key={sz} type="button" onClick={()=>setEditTamano(sz)}
+              style={{flex:1,padding:"4px 0",fontSize:12,fontWeight:editTamano===sz?600:400,borderRadius:6,cursor:"pointer",fontFamily:"inherit",
+                border:editTamano===sz?`1px solid ${BRAND}`:`1px solid ${c.border}`,
+                background:editTamano===sz?"rgba(117,176,228,0.12)":c.surface,
+                color:editTamano===sz?BRAND:c.textMuted}}>{sz}</button>
+          ))}
+        </div>
+        {/* Ícono */}
+        <div style={{fontSize:11,color:c.textFaint,marginBottom:4,textTransform:"uppercase",letterSpacing:".4px"}}>Ícono</div>
+        <IconPicker value={editIcon} onChange={setEditIcon}/>
+        {/* Actions */}
+        <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:12}}>
+          <Btn sm ghost onClick={()=>setEditId(null)}>Cancelar</Btn>
+          <Btn sm onClick={saveEdit}>{editSaving?"Guardando...":"Guardar"}</Btn>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1233,7 +1330,7 @@ function CanvasView({tudus=[],loading,onNew,onTudu,onRefresh,dark:dk,isMobile}) 
         </div>
       </div>
       <div role="tabpanel">
-        {view==="postits"  && <PostitsView tudus={tudus} onTudu={onTudu} dark={dk}/>}
+        {view==="postits"  && <PostitsView tudus={tudus} onTudu={onTudu} onRefresh={onRefresh} dark={dk}/>}
         {view==="list"     && <ListView title="My Work" tudus={tudus} loading={loading} onTudu={onTudu} dark={dk}/>}
         {view==="kanban"   && <KanbanView tudus={tudus} mode="estado" onTudu={onTudu} onRefresh={onRefresh} dark={dk}/>}
         {view==="kplan"    && <><p style={{fontSize:13,color:c.textFaint,margin:"0 0 4px"}}>Arrastrá cards entre columnas para re-planificar</p><KanbanView tudus={tudus} mode="cuando" onTudu={onTudu} onRefresh={onRefresh} dark={dk}/></>}
