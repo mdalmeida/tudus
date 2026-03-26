@@ -119,6 +119,53 @@ export async function deleteTudu(id: string): Promise<Tudu> {
   return updateTudu(id, { eliminado: true });
 }
 
+// ── Orden ───────────────────────────────────────────────────────────────────
+
+export async function getNextOrden(): Promise<number> {
+  const { data, error } = await supabase
+    .from("tudus")
+    .select("orden")
+    .order("orden", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return (data && data.length > 0 ? data[0].orden : 0) + 1;
+}
+
+// ── Trash ───────────────────────────────────────────────────────────────────
+
+export async function getDeletedTudus(): Promise<Tudu[]> {
+  const { data, error } = await supabase
+    .from("tudus")
+    .select("*")
+    .eq("eliminado", true)
+    .order("orden", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data || []).map(rowToTudu);
+}
+
+export async function restoreTudu(id: string): Promise<Tudu> {
+  return updateTudu(id, { eliminado: false });
+}
+
+export async function permanentDeleteTudu(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("tudus")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// ── Supabase ping ───────────────────────────────────────────────────────────
+
+export async function pingSupabase(): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("tudus").select("id").limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 // ── Page content ─────────────────────────────────────────────────────────────
 // In Supabase the content lives in the `contenido` column directly,
 // so these are thin wrappers that keep the same API as the Notion version.

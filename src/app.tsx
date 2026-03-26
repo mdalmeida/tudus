@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
-import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, type Tudu, type Subtarea } from "./supabase";
+import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, getNextOrden, getDeletedTudus, restoreTudu, permanentDeleteTudu, pingSupabase, type Tudu, type Subtarea } from "./supabase";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray, ArrowsClockwise } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
@@ -322,6 +322,12 @@ function TuduForm({title:formTitle,action,onClose,onCreated,editTudu,dark:dk,def
   const titleId = "form-title-"+action;
   const TIPOS_CLEAN = TUDU_TYPES.map(t=>t.replace(/^.+\s/,""));
 
+  useEffect(()=>{
+    const h=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();handleSubmit();}};
+    document.addEventListener("keydown",h);
+    return ()=>document.removeEventListener("keydown",h);
+  });
+
   const handleSubmit = async () => {
     if (!nombre.trim()) return;
     setSaving(true);
@@ -333,7 +339,7 @@ function TuduForm({title:formTitle,action,onClose,onCreated,editTudu,dark:dk,def
         contenido,
       };
       if(et?.id) await updateTudu(et.id, data);
-      else await createTudu(data);
+      else { data.orden = await getNextOrden(); await createTudu(data); }
       onCreated?.();
       onClose();
     } catch (err) {
@@ -406,6 +412,12 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
       .catch(err=>console.error("Error cargando contenido:",err))
       .finally(()=>setBodyLoading(false));
   },[tudu?.id]);
+
+  useEffect(()=>{
+    const h=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();handleSave();}};
+    document.addEventListener("keydown",h);
+    return ()=>document.removeEventListener("keydown",h);
+  });
 
   const addSub = ()=>{
     if(!newSub.trim()) return;
@@ -1323,8 +1335,9 @@ function CanvasView({tudus=[],loading,onNew,onTudu,onRefresh,dark:dk,isMobile}) 
 }
 
 // ── ConfigView ────────────────────────────────────────────────────────────────
-function ConfigView({dark:dk,onToggle}) {
+function ConfigView({dark:dk,onToggle,onRefresh}) {
   const c = th(dk||false);
+  const {show:toast,update:toastUpdate} = useGlobalToast();
   const [cats,setCats]       = useState(CATS_INIT);
   const [estados,setEstados] = useState(()=>{
     try{ const s=localStorage.getItem("tudus_estados"); return s?JSON.parse(s):ESTADOS_DEFAULT; }catch{ return ESTADOS_DEFAULT; }
@@ -1333,6 +1346,23 @@ function ConfigView({dark:dk,onToggle}) {
   const [editCat,setEditCat] = useState(null);
   const [newEstado,setNewEstado] = useState("");
   const [section,setSection] = useState("appearance");
+  // Supabase connection status
+  const [sbStatus,setSbStatus] = useState<"checking"|"connected"|"disconnected">("checking");
+  useEffect(()=>{
+    if(section==="appearance"){
+      setSbStatus("checking");
+      pingSupabase().then(ok=>setSbStatus(ok?"connected":"disconnected")).catch(()=>setSbStatus("disconnected"));
+    }
+  },[section]);
+  // Trash
+  const [trashTudus,setTrashTudus] = useState<any[]>([]);
+  const [trashLoading,setTrashLoading] = useState(false);
+  useEffect(()=>{
+    if(section==="trash"){
+      setTrashLoading(true);
+      getDeletedTudus().then(setTrashTudus).catch(err=>console.error(err)).finally(()=>setTrashLoading(false));
+    }
+  },[section]);
   const SECTIONS = [["appearance","Apariencia"],["categories","Categorías"],["states","Estados"],["trash","Papelera"]];
 
   const saveEditCat=()=>{
@@ -1372,9 +1402,11 @@ function ConfigView({dark:dk,onToggle}) {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
                 <div style={{fontSize:13,fontWeight:500,color:c.text}}>Backend</div>
-                <div style={{fontSize:13,color:c.textFaint}}>Notion</div>
+                <div style={{fontSize:13,color:c.textFaint}}>Supabase</div>
               </div>
-              <span style={{fontSize:14,color:"#22C55E",fontWeight:500}}>● Conectado</span>
+              <span style={{fontSize:14,fontWeight:500,color:sbStatus==="connected"?"#22C55E":sbStatus==="disconnected"?"#EF4444":c.textFaint}}>
+                {sbStatus==="checking"?"⟳ Verificando...":sbStatus==="connected"?"● Conectado":"○ Desconectado"}
+              </span>
             </div>
           </>
         )}
@@ -1438,9 +1470,43 @@ function ConfigView({dark:dk,onToggle}) {
         {section==="trash"&&(
           <>
             <p style={{fontSize:14,color:c.textMuted,marginTop:0,marginBottom:12}}>Tudús eliminados — podés restaurarlos o eliminarlos definitivamente.</p>
-            <div style={{background:c.surface2,borderRadius:8,padding:12,border:`1px dashed ${c.border}`}}>
-              <p style={{fontSize:14,color:c.textFaint,textAlign:"center",margin:0}}>No hay tudús eliminados.</p>
-            </div>
+            {trashLoading&&<p style={{fontSize:14,color:c.textFaint,textAlign:"center",padding:12}}>Cargando...</p>}
+            {!trashLoading&&trashTudus.length===0&&(
+              <div style={{background:c.surface2,borderRadius:8,padding:12,border:`1px dashed ${c.border}`}}>
+                <p style={{fontSize:14,color:c.textFaint,textAlign:"center",margin:0}}>No hay tudús eliminados.</p>
+              </div>
+            )}
+            {!trashLoading&&trashTudus.length>0&&(
+              <ul style={{listStyle:"none",padding:0,margin:0}}>
+                {trashTudus.map((t:any)=>{
+                  const emoji=TIPO_EMOJI[t.tipo]||"📋";
+                  return (
+                    <li key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:`1px solid ${c.border}`}}>
+                      <span style={{fontSize:14}}>{emoji}</span>
+                      <div style={{flex:1,overflow:"hidden"}}>
+                        <div style={{fontSize:14,color:c.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</div>
+                        <div style={{fontSize:11,color:c.textFaint}}>{t.categoria} · {t.estado}</div>
+                      </div>
+                      <button type="button" onClick={async()=>{
+                        const tid=toast("Restaurando...","loading");
+                        try{ await restoreTudu(t.id); setTrashTudus(p=>p.filter(x=>x.id!==t.id)); toastUpdate(tid,"✓ Restaurado","success"); onRefresh?.(); }
+                        catch(err){ console.error(err); toastUpdate(tid,"✗ Error","error"); }
+                      }} style={{fontSize:12,padding:"4px 10px",borderRadius:6,cursor:"pointer",fontFamily:"inherit",border:`1px solid ${BRAND}`,background:"transparent",color:BRAND}}>
+                        Restaurar
+                      </button>
+                      <button type="button" onClick={async()=>{
+                        if(!confirm("¿Eliminar definitivamente? No se puede deshacer.")) return;
+                        const tid=toast("Eliminando...","loading");
+                        try{ await permanentDeleteTudu(t.id); setTrashTudus(p=>p.filter(x=>x.id!==t.id)); toastUpdate(tid,"✓ Eliminado","success"); }
+                        catch(err){ console.error(err); toastUpdate(tid,"✗ Error","error"); }
+                      }} style={{fontSize:12,padding:"4px 10px",borderRadius:6,cursor:"pointer",fontFamily:"inherit",border:"none",background:"#DC2626",color:"#fff",fontWeight:500}}>
+                        Eliminar
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </>
         )}
       </div>
@@ -1546,6 +1612,18 @@ export default function App() {
   useEffect(()=>{ document.documentElement.classList.toggle("dark",dark); },[dark]);
   useEffect(()=>{ if(isMobile) setCollapsed(true); },[isMobile]);
 
+  // Global shortcut: Ctrl + + → new tudú
+  useEffect(()=>{
+    const h=(e:KeyboardEvent)=>{
+      if((e.ctrlKey||e.metaKey)&&(e.key==="+"||e.key==="=")){
+        e.preventDefault();
+        setShowNew(true);
+      }
+    };
+    document.addEventListener("keydown",h);
+    return ()=>document.removeEventListener("keydown",h);
+  },[]);
+
   const c = th(dark);
 
   return (
@@ -1630,7 +1708,7 @@ export default function App() {
           {screen==="inbox"     && <ListView title="Inbox" tudus={allTudus.filter(t=>t.categoria==="Inbox")} loading={tudusLoading} onTudu={openTudu} dark={dark}/>}
           {screen==="category"  && <CategoryView tudus={allTudus.filter(t=>t.categoria===selectedCat)} onView={()=>setScreen("canvas")} onTudu={openTudu}/>}
           {screen==="canvas"    && <CanvasView tudus={allTudus.filter(t=>t.categoria===selectedCat)} loading={tudusLoading} onNew={()=>setShowNew(true)} onTudu={openTudu} onRefresh={refresh} dark={dark} isMobile={isMobile}/>}
-          {screen==="config"    && <ConfigView dark={dark} onToggle={()=>setDark(d=>!d)}/>}
+          {screen==="config"    && <ConfigView dark={dark} onToggle={()=>setDark(d=>!d)} onRefresh={refresh}/>}
         </div>
       </div>
 
