@@ -423,13 +423,21 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
             <textarea value={bodyDraft} onChange={e=>setBodyDraft(e.target.value)}
               style={{width:"100%",minHeight:100,fontSize:14,lineHeight:1.7,color:c.text,background:c.surface2,border:`1px solid ${BRAND}`,borderRadius:8,padding:12,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
             <div style={{display:"flex",gap:6,marginTop:6}}>
-              <Btn sm onClick={async()=>{
+              <Btn sm disabled={bodySaving} onClick={async()=>{
+                const contentChanged = bodyDraft !== bodyText;
+                if(!contentChanged){ setBodyEditing(false); return; }
                 setBodySaving(true);
-                try{ await updatePageContent(tudu.id,bodyDraft); setBodyText(bodyDraft); setBodyEditing(false); onSaved?.(); }
+                try{
+                  const promises: Promise<any>[] = [];
+                  promises.push(updatePageContent(tudu.id,bodyDraft));
+                  if(tudu.contenido!==bodyDraft) promises.push(updateTudu(tudu.id,{contenido:bodyDraft.slice(0,2000)}));
+                  await Promise.all(promises);
+                  setBodyText(bodyDraft); setBodyEditing(false); onSaved?.();
+                }
                 catch(err){ console.error(err); }
                 finally{ setBodySaving(false); }
-              }}>{bodySaving?"Guardando...":"Guardar"}</Btn>
-              <Btn sm ghost onClick={()=>{setBodyDraft(bodyText);setBodyEditing(false);}}>Cancelar</Btn>
+              }} style={bodySaving?{opacity:0.6,cursor:"not-allowed"}:{}}>{bodySaving?"Guardando...":"Guardar"}</Btn>
+              <Btn sm ghost disabled={bodySaving} onClick={()=>{setBodyDraft(bodyText);setBodyEditing(false);}}>Cancelar</Btn>
             </div>
           </div>
         ):bodyText?(
@@ -620,14 +628,16 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
   const allTudus = rawTudus.map(tuduToPool);
   const [dragId,setDragId]     = useState(null);
   const [overSlot,setOverSlot] = useState(null);
+  const [movedIds,setMovedIds] = useState<Record<string,string>>({});
   const [quickVal,setQuickVal] = useState("");
   const [quickSaving,setQuickSaving] = useState(false);
   const slotRefs = useRef({});
   const {show,Toast} = useToast();
 
   const SLOTS = ["Hoy","Mañana / Pasado","Esta semana","Próxima semana"];
-  const pool = allTudus.filter(t=>!t.cuando||t.cuando==="Sin fecha"||t.cuando==="Algún día");
-  const slotItems = (slot: string) => allTudus.filter(t=>CUANDO_TO_SLOT[t.cuando]===slot);
+  const withMoves = allTudus.map(t=>movedIds[t.id]?{...t,cuando:movedIds[t.id]}:t);
+  const pool = withMoves.filter(t=>!t.cuando||t.cuando==="Sin fecha"||t.cuando==="Algún día");
+  const slotItems = (slot: string) => withMoves.filter(t=>CUANDO_TO_SLOT[t.cuando]===slot);
 
   const flyTo=(cx,cy,slotEl,color)=>{
     if(!slotEl) return;
@@ -646,12 +656,13 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
     if(!dragId) return;
     const item=allTudus.find(p=>p.id===dragId);
     flyTo(e.clientX,e.clientY,slotRefs.current[slot],item?.c?.bg||"#FEF08A");
+    const movedId=dragId;
     setDragId(null);setOverSlot(null);
     const cuando = SLOT_TO_CUANDO[slot];
     if(cuando){
-      setAllTudus(p=>p.map(t=>t.id===dragId?{...t,cuando}:t));
+      setMovedIds(p=>({...p,[movedId]:cuando}));
       show("Asignado a: "+slot);
-      try{ await updateTudu(dragId,{cuando}); onRefresh?.(); }catch(err){ console.error(err); show("Error al mover"); onRefresh?.(); }
+      try{ await updateTudu(movedId,{cuando}); onRefresh?.(); }catch(err){ console.error(err); show("Error al mover"); onRefresh?.(); }
     }
   };
 
@@ -668,14 +679,14 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
   };
 
   const TuduChip=({item})=>(
-    <div draggable
-      onDragStart={e=>{setDragId(item.id);e.dataTransfer.setData("text/plain",String(item.id));}}
+    <div draggable="true"
+      onDragStart={e=>{setDragId(item.id);e.dataTransfer.setData("text/plain",String(item.id));e.dataTransfer.effectAllowed="move";}}
       onDragEnd={()=>setDragId(null)}
       onClick={()=>onTudu(item)}
       style={{background:item.c.bg,color:item.c.tx,borderRadius:8,padding:"6px 9px",fontSize:13,cursor:"grab",minWidth:80,maxWidth:140,userSelect:"none",opacity:dragId===item.id?0.3:1,boxShadow:"1px 2px 6px rgba(0,0,0,0.12)",transition:"opacity .15s"}}>
-      <div style={{fontSize:11,opacity:.7,marginBottom:1}}>{item.type}</div>
-      <div style={{fontWeight:500,lineHeight:1.3}}>{item.title}</div>
-      <div style={{fontSize:11,opacity:.6,marginTop:2}}>{item.cat}</div>
+      <div style={{pointerEvents:"none",fontSize:11,opacity:.7,marginBottom:1}}>{item.type}</div>
+      <div style={{pointerEvents:"none",fontWeight:500,lineHeight:1.3}}>{item.title}</div>
+      <div style={{pointerEvents:"none",fontSize:11,opacity:.6,marginTop:2}}>{item.cat}</div>
     </div>
   );
 
