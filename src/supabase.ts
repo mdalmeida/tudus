@@ -5,6 +5,8 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_KEY,
 );
 
+export type Subtarea = { id: number; titulo: string; done: boolean };
+
 export type Tudu = {
   id: string;
   title: string;
@@ -21,6 +23,7 @@ export type Tudu = {
   eliminado: boolean;
   pos_x: number;
   pos_y: number;
+  subtareas: Subtarea[];
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,6 +45,7 @@ function rowToTudu(r: any): Tudu {
     eliminado: r.eliminado ?? false,
     pos_x: r.pos_x ?? 0,
     pos_y: r.pos_y ?? 0,
+    subtareas: r.subtareas ?? [],
   };
 }
 
@@ -69,6 +73,7 @@ function tuduToRow(data: Partial<Omit<Tudu, "id">>): Record<string, any> {
   if (data.eliminado !== undefined) row.eliminado = data.eliminado;
   if ((data as any).pos_x !== undefined) row.pos_x = (data as any).pos_x;
   if ((data as any).pos_y !== undefined) row.pos_y = (data as any).pos_y;
+  if ((data as any).subtareas !== undefined) row.subtareas = (data as any).subtareas;
   return row;
 }
 

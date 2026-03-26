@@ -1,12 +1,12 @@
 import React from 'react';
 import { useState, useRef, useEffect } from "react";
-import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, type Tudu } from "./supabase";
+import { getTudus, createTudu, updateTudu, deleteTudu, getPageContent, updatePageContent, type Tudu, type Subtarea } from "./supabase";
 import { CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart, Phone, MagnifyingGlass, Star, Lightning, Briefcase, Wallet, Heartbeat, GridFour, Gear, SignOut, Tray, ArrowsClockwise } from "@phosphor-icons/react";
 
 const BRAND = "#75b0e4";
 
 const TUDU_TYPES = ["📋 Tarea","💡 Idea","💬 WhatsApp","✉ Mail","👥 Teams","🛒 Compra","📞 Llamada","🎯 Decisión","🔁 Hábito","📚 Aprender","💭 Reflexionar","🔎 Investigar","💪 Ejercicio","✍ Redactar","📊 Analizar"];
-const ESTADOS_DEFAULT = ["Por hacer","Empezada","En curso","Terminando","Esperando","Listo","No lo haré"];
+const ESTADOS_DEFAULT = ["Por hacer","Empezada","Terminando","Esperando","Listo","No lo haré"];
 const CATEGORIAS_NAMES = ["My Work","Setup Base","House & Car","Financial","Family","Social & Experiences","Skills","Health","Mindset","Inbox"];
 const CUANDO = ["Sin fecha","Hoy","Mañana","Esta semana","Próxima semana","Este mes","Algún día"];
 
@@ -51,6 +51,12 @@ const TIPO_EMOJI: Record<string,string> = {
   "Tarea":"📋","Idea":"💡","WhatsApp":"💬","Mail":"✉","Teams":"👥","Compra":"🛒",
   "Llamada":"📞","Decisión":"🎯","Hábito":"🔁","Aprender":"📚","Reflexionar":"💭",
   "Investigar":"🔎","Ejercicio":"💪","Redactar":"✍","Analizar":"📊",
+};
+const TIPO_ICONO: Record<string,string> = {
+  "Tarea":"CheckSquare","Idea":"Lightbulb","WhatsApp":"ChatCircle","Mail":"Envelope","Teams":"Users",
+  "Compra":"ShoppingCart","Llamada":"Phone","Decisión":"Star","Hábito":"ArrowsClockwise",
+  "Aprender":"Lightbulb","Reflexionar":"ChatCircle","Investigar":"MagnifyingGlass",
+  "Ejercicio":"Heartbeat","Redactar":"Briefcase","Analizar":"GridFour",
 };
 function tuduToPool(t: Tudu, i: number) {
   return { id:t.id, type:`${TIPO_EMOJI[t.tipo]||"📋"} ${t.tipo}`, title:t.title, cat:t.categoria, c:PCOLORS[i % PCOLORS.length], cuando:t.cuando, estado:t.estado };
@@ -169,7 +175,7 @@ function useEscapeKey(fn) {
 const PHO_MAP: Record<string, React.ElementType> = {
   CheckSquare, Lightbulb, ChatCircle, Envelope, Users, ShoppingCart,
   Phone, MagnifyingGlass, MagGlass: MagnifyingGlass, Star, Lightning,
-  Briefcase, Wallet, HeartPulse: Heartbeat, Heartbeat, GridFour, Gear, SignOut, Tray,
+  Briefcase, Wallet, HeartPulse: Heartbeat, Heartbeat, GridFour, Gear, SignOut, Tray, ArrowsClockwise,
 };
 const PHO_KEYS = Object.keys(PHO_MAP).filter(k => k !== "MagGlass");
 
@@ -277,21 +283,19 @@ function DatePicker({cuando,deadline,onChange,dark:dk}) {
   const [tmpDate,setTmpDate] = useState(deadline||"");
   const btnRef = useRef<HTMLButtonElement>(null);
   const [rect,setRect] = useState<{top:number,left:number,width:number}|null>(null);
-  const isExact = tmpCuando==="Fecha exacta";
-  const hint = !isExact && tmpCuando!=="Sin fecha" ? calcDate(tmpCuando) : null;
+  const hint = tmpCuando!=="Sin fecha" ? calcDate(tmpCuando) : null;
   const fmtDl = (dl:string) => { if(!dl) return ""; try{ return toLocal(dl); }catch{ return dl; } };
-  const display = cuando==="Fecha exacta" ? (deadline?fmtDl(deadline):"Elegir fecha") : cuando==="Sin fecha" ? "Sin fecha" : `${cuando}${deadline?" · "+fmtDl(deadline):""}`;
+  const display = cuando==="Sin fecha" && !deadline ? "Sin fecha" : cuando==="Sin fecha" && deadline ? fmtDl(deadline) : `${cuando}${deadline?" · "+fmtDl(deadline):""}`;
   const toggle=()=>{
     setTmpCuando(cuando||"Sin fecha");setTmpDate(deadline||"");
     if(!open&&btnRef.current){const r=btnRef.current.getBoundingClientRect();setRect({top:r.bottom+4,left:r.left,width:r.width});}
     setOpen(!open);
   };
   const save=()=>{
-    const dl = isExact ? tmpDate : calcDate(tmpCuando)||null;
-    onChange(tmpCuando==="Fecha exacta"?"Sin fecha":tmpCuando, dl||null);
+    const dl = tmpDate || (hint ? hint : null);
+    onChange(tmpCuando, dl||null);
     setOpen(false);
   };
-  const clear=()=>{ onChange("Sin fecha",null); setOpen(false); };
   return (
     <div style={{position:"relative"}}>
       <button ref={btnRef} type="button" onClick={toggle}
@@ -300,19 +304,16 @@ function DatePicker({cuando,deadline,onChange,dark:dk}) {
       </button>
       {open&&rect&&(
         <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:rect.top,left:rect.left,width:rect.width,zIndex:9998,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
-          <select value={tmpCuando} onChange={e=>{setTmpCuando(e.target.value);if(e.target.value!=="Fecha exacta")setTmpDate("");}}
+          <select value={tmpCuando} onChange={e=>setTmpCuando(e.target.value)}
             style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}>
-            {[...CUANDO,"Fecha exacta"].map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
+            {CUANDO.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
           </select>
-          {isExact&&<input type="date" value={tmpDate} onChange={e=>setTmpDate(e.target.value)}
-            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}/>}
+          <input type="date" value={tmpDate} onChange={e=>setTmpDate(e.target.value)}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}/>
           {hint&&<div style={{fontSize:12,color:BRAND,marginBottom:8}}>→ {toLocal(hint)}</div>}
-          <div style={{display:"flex",gap:6,justifyContent:"space-between"}}>
-            <button type="button" onClick={clear} style={{fontSize:12,color:c.textFaint,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0}}>Sin fecha</button>
-            <div style={{display:"flex",gap:6}}>
-              <Btn sm ghost onClick={()=>setOpen(false)}>Cancelar</Btn>
-              <Btn sm onClick={save}>Guardar</Btn>
-            </div>
+          <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+            <Btn sm ghost onClick={()=>setOpen(false)}>Cancelar</Btn>
+            <Btn sm onClick={save}>Guardar</Btn>
           </div>
         </div>
       )}
@@ -405,7 +406,7 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
   const [bodyDraft,setBodyDraft]     = useState("");
 
   // Subtasks & misc
-  const [subtasks,setSubtasks] = useState([{id:1,title:"Preparar agenda",done:false},{id:2,title:"Confirmar asistentes",done:true}]);
+  const [subtasks,setSubtasks] = useState<Subtarea[]>(tudu?.subtareas||[]);
   const [newSub,setNewSub]     = useState("");
   const [saving,setSaving]     = useState(false);
   const [deleting,setDeleting] = useState(false);
@@ -425,7 +426,7 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
 
   const addSub = ()=>{
     if(!newSub.trim()) return;
-    setSubtasks(p=>[...p,{id:Date.now(),title:newSub.trim(),done:false}]);
+    setSubtasks(p=>[...p,{id:Date.now(),titulo:newSub.trim(),done:false}]);
     setNewSub("");
   };
 
@@ -437,6 +438,7 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         title:titulo.trim()||tudu?.title, tipo, categoria:cat, estado, cuando,
         deadline:deadline||null,
         etiquetas:tags.split(",").map(t=>t.trim()).filter(Boolean),
+        subtareas,
       };
       const promises: Promise<any>[] = [updateTudu(tudu.id,data)];
       const contentChanged = bodyDraft!==bodyText;
@@ -542,8 +544,8 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
                 <input type="checkbox" id={"sub-"+sub.id} checked={sub.done}
                   onChange={()=>setSubtasks(p=>p.map(s=>s.id===sub.id?{...s,done:!s.done}:s))}
                   style={{accentColor:BRAND,cursor:"pointer",flexShrink:0}}/>
-                <label htmlFor={"sub-"+sub.id} style={{flex:1,fontSize:14,cursor:"pointer",color:sub.done?c.textFaint:c.text,textDecoration:sub.done?"line-through":"none"}}>{sub.title}</label>
-                <button type="button" aria-label={"Eliminar "+sub.title}
+                <label htmlFor={"sub-"+sub.id} style={{flex:1,fontSize:14,cursor:"pointer",color:sub.done?c.textFaint:c.text,textDecoration:sub.done?"line-through":"none"}}>{sub.titulo}</label>
+                <button type="button" aria-label={"Eliminar "+sub.titulo}
                   onClick={()=>setSubtasks(p=>p.filter(s=>s.id!==sub.id))}
                   style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:14,padding:0,lineHeight:1}}>×</button>
               </li>
@@ -572,7 +574,7 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
       {/* Footer: Eliminar | Cancelar | Guardar */}
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button type="button" onClick={handleDelete} disabled={deleting}
-          style={{padding:"6px 14px",borderRadius:8,border:"1px solid #FCA5A5",background:"transparent",color:"#DC2626",cursor:"pointer",fontSize:13,fontFamily:"inherit",opacity:deleting?0.5:1}}>
+          style={{padding:"6px 14px",borderRadius:8,border:"none",background:"#DC2626",color:"#fff",cursor:"pointer",fontSize:13,fontFamily:"inherit",fontWeight:500,opacity:deleting?0.5:1}}>
           {deleting?"Eliminando...":"🗑 Eliminar"}
         </button>
         <div style={{flex:1}}/>
@@ -1002,7 +1004,6 @@ function PostitsView({tudus=[],onTudu,onRefresh,dark:dk}) {
   const [editColor,setEditColor] = useState("");
   const [editTamano,setEditTamano] = useState("M");
   const [editIcon,setEditIcon] = useState("CheckSquare");
-  const [editRect,setEditRect] = useState<{top:number,left:number}|null>(null);
   const [editSaving,setEditSaving] = useState(false);
 
   useEffect(()=>{
@@ -1061,12 +1062,10 @@ function PostitsView({tudus=[],onTudu,onRefresh,dark:dk}) {
   const onDblClick=(e:React.MouseEvent,t:any)=>{
     if(clickTimer.current) clearTimeout(clickTimer.current);
     e.stopPropagation();
-    const r=(e.currentTarget as HTMLElement).getBoundingClientRect();
     setEditId(t.id);
     setEditColor(t.color||"");
     setEditTamano(t.tamano||"M");
-    setEditIcon(t.color?"CheckSquare":"CheckSquare"); // icon not stored yet, default
-    setEditRect({top:r.top,left:r.right+8});
+    setEditIcon(TIPO_ICONO[t.tipo]||"CheckSquare");
   };
 
   const saveEdit=async()=>{
@@ -1102,7 +1101,7 @@ function PostitsView({tudus=[],onTudu,onRefresh,dark:dk}) {
         const emoji=TIPO_EMOJI[t.tipo]||"📋";
         return (
           <div key={t.id} onMouseDown={e=>onMD(e,t.id)} onMouseUp={()=>onMU(t.id)} onDoubleClick={e=>onDblClick(e,t)}
-            style={{position:"absolute",left:p.x,top:p.y,width:sz.w,height:sz.h,background:pc.bg,color:pc.tx,borderRadius:8,padding:"8px 10px",fontSize:13,userSelect:"none",cursor:drag.current?.id===t.id?"grabbing":"grab",boxShadow:"2px 3px 8px rgba(0,0,0,0.18)",zIndex:drag.current?.id===t.id?50:editId===t.id?49:1,overflow:"hidden",outline:editId===t.id?`2px solid ${BRAND}`:"none"}}>
+            style={{position:"absolute",left:p.x,top:p.y,width:sz.w,height:sz.h,background:pc.bg,color:pc.tx,borderRadius:8,padding:"8px 10px",fontSize:13,userSelect:"none",cursor:drag.current?.id===t.id?"grabbing":"grab",boxShadow:"2px 3px 8px rgba(0,0,0,0.18)",zIndex:drag.current?.id===t.id?50:1,overflow:"hidden"}}>
             <div style={{fontSize:11,opacity:.75,marginBottom:2,pointerEvents:"none"}}>{emoji} {t.tipo}</div>
             <div style={{fontWeight:500,lineHeight:1.3,pointerEvents:"none"}}>{t.title}</div>
             <div style={{fontSize:11,opacity:.6,marginTop:3,pointerEvents:"none"}}>{t.cuando||"Sin fecha"}</div>
@@ -1110,27 +1109,27 @@ function PostitsView({tudus=[],onTudu,onRefresh,dark:dk}) {
         );
       })}
     </div>
-    {/* Mini edit panel (fixed, above everything) */}
-    {editId&&editRect&&(
-      <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:editRect.top,left:editRect.left,zIndex:9998,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:14,width:220,boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <span style={{fontSize:12,fontWeight:600,color:c.text}}>Personalizar</span>
-          <button type="button" onClick={()=>setEditId(null)} style={{background:"none",border:"none",cursor:"pointer",color:c.textFaint,fontSize:14}}>✕</button>
+    {/* Modal personalizar postit */}
+    {editId&&(
+      <Overlay onClose={()=>setEditId(null)} dark={dk} titleId="postit-edit-title">
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <h2 id="postit-edit-title" style={{fontSize:14,fontWeight:500,margin:0,color:c.text}}>Personalizar postit</h2>
+          <button type="button" aria-label="Cerrar" onClick={()=>setEditId(null)} style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:c.textFaint}}>✕</button>
         </div>
         {/* Color */}
         <div style={{fontSize:11,color:c.textFaint,marginBottom:4,textTransform:"uppercase",letterSpacing:".4px"}}>Color</div>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
           {POSTIT_COLORS.map(clr=>(
             <button key={clr} type="button" onClick={()=>setEditColor(clr)}
-              style={{width:24,height:24,borderRadius:6,background:clr,border:editColor===clr?`2px solid ${BRAND}`:"2px solid transparent",cursor:"pointer",outline:"none"}}/>
+              style={{width:28,height:28,borderRadius:6,background:clr,border:editColor===clr?`2px solid ${BRAND}`:"2px solid transparent",cursor:"pointer",outline:"none"}}/>
           ))}
         </div>
         {/* Tamaño */}
         <div style={{fontSize:11,color:c.textFaint,marginBottom:4,textTransform:"uppercase",letterSpacing:".4px"}}>Tamaño</div>
-        <div style={{display:"flex",gap:4,marginBottom:10}}>
+        <div style={{display:"flex",gap:4,marginBottom:14}}>
           {TAMANOS.map(sz=>(
             <button key={sz} type="button" onClick={()=>setEditTamano(sz)}
-              style={{flex:1,padding:"4px 0",fontSize:12,fontWeight:editTamano===sz?600:400,borderRadius:6,cursor:"pointer",fontFamily:"inherit",
+              style={{flex:1,padding:"6px 0",fontSize:13,fontWeight:editTamano===sz?600:400,borderRadius:6,cursor:"pointer",fontFamily:"inherit",
                 border:editTamano===sz?`1px solid ${BRAND}`:`1px solid ${c.border}`,
                 background:editTamano===sz?"rgba(117,176,228,0.12)":c.surface,
                 color:editTamano===sz?BRAND:c.textMuted}}>{sz}</button>
@@ -1140,11 +1139,11 @@ function PostitsView({tudus=[],onTudu,onRefresh,dark:dk}) {
         <div style={{fontSize:11,color:c.textFaint,marginBottom:4,textTransform:"uppercase",letterSpacing:".4px"}}>Ícono</div>
         <IconPicker value={editIcon} onChange={setEditIcon}/>
         {/* Actions */}
-        <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:12}}>
-          <Btn sm ghost onClick={()=>setEditId(null)}>Cancelar</Btn>
-          <Btn sm onClick={saveEdit}>{editSaving?"Guardando...":"Guardar"}</Btn>
+        <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:16}}>
+          <Btn ghost onClick={()=>setEditId(null)}>Cancelar</Btn>
+          <Btn onClick={saveEdit}>{editSaving?"Guardando...":"Guardar"}</Btn>
         </div>
-      </div>
+      </Overlay>
     )}
     </>
   );
