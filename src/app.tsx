@@ -683,7 +683,7 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
       onDragStart={e=>{setDragId(item.id);e.dataTransfer.setData("text/plain",String(item.id));e.dataTransfer.effectAllowed="move";}}
       onDragEnd={()=>setDragId(null)}
       onClick={()=>onTudu(item)}
-      style={{background:item.c.bg,color:item.c.tx,borderRadius:8,padding:"6px 9px",fontSize:13,cursor:"grab",minWidth:80,maxWidth:140,userSelect:"none",opacity:dragId===item.id?0.3:1,boxShadow:"1px 2px 6px rgba(0,0,0,0.12)",transition:"opacity .15s"}}>
+      style={{background:item.c.bg,color:item.c.tx,borderRadius:8,padding:"6px 9px",fontSize:13,cursor:"grab",width:140,height:90,overflow:"hidden",flexShrink:0,userSelect:"none",opacity:dragId===item.id?0.3:1,boxShadow:"1px 2px 6px rgba(0,0,0,0.12)",transition:"opacity .15s"}}>
       <div style={{pointerEvents:"none",fontSize:11,opacity:.7,marginBottom:1}}>{item.type}</div>
       <div style={{pointerEvents:"none",fontWeight:500,lineHeight:1.3}}>{item.title}</div>
       <div style={{pointerEvents:"none",fontSize:11,opacity:.6,marginTop:2}}>{item.cat}</div>
@@ -879,7 +879,7 @@ function CategoryView({tudus=[],onView,onTudu}) {
           <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".5px",color:"rgba(255,255,255,0.4)",marginBottom:6,fontWeight:500}}>Tudús más importantes</div>
           <div style={{display:"flex",gap:8}}>
             {TOP.map((item,i)=>(
-              <button key={i} type="button" onClick={()=>onTudu(item)} style={{flex:1,borderRadius:8,padding:"8px 10px",cursor:"pointer",background:item.bg,color:item.tx,boxShadow:"1px 2px 6px rgba(0,0,0,0.18)",border:"none",textAlign:"left"}}
+              <button key={i} type="button" onClick={()=>onTudu(item)} style={{width:160,height:100,flexShrink:0,borderRadius:8,padding:"8px 10px",cursor:"pointer",background:item.bg,color:item.tx,boxShadow:"1px 2px 6px rgba(0,0,0,0.18)",border:"none",textAlign:"left",overflow:"hidden"}}
                 onMouseOver={e=>e.currentTarget.style.transform="scale(1.02)"}
                 onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
                 <div style={{fontSize:11,opacity:.6,marginBottom:2}}>{item.type}</div>
