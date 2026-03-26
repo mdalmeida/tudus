@@ -118,13 +118,42 @@ function useIsMobile() {
   },[]);
   return m;
 }
-function useToast() {
-  const [msg,setMsg] = useState(null);
-  const show = m=>{setMsg(m);setTimeout(()=>setMsg(null),2200);};
-  const Toast = ()=>msg
-    ? <div role="status" aria-live="polite" style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",background:"#111",color:"#fff",padding:"6px 16px",borderRadius:8,fontSize:14,zIndex:999,pointerEvents:"none",whiteSpace:"nowrap"}}>{msg}</div>
-    : null;
-  return {show,Toast};
+// ── Global Toast ─────────────────────────────────────────────────────────────
+type ToastType = "loading"|"success"|"error";
+type ToastEntry = {id:number,msg:string,type:ToastType};
+const ToastCtx = React.createContext<(msg:string,type?:ToastType,duration?:number)=>number>(()=>0);
+const ToastUpdateCtx = React.createContext<(id:number,msg:string,type?:ToastType,duration?:number)=>void>(()=>{});
+function useGlobalToast(){ return {show:React.useContext(ToastCtx), update:React.useContext(ToastUpdateCtx)}; }
+let _toastId=0;
+function GlobalToastProvider({children}:{children:React.ReactNode}){
+  const [toasts,setToasts]=useState<ToastEntry[]>([]);
+  const timers=useRef<Record<number,ReturnType<typeof setTimeout>>>({});
+  const show=React.useCallback((msg:string,type:ToastType="success",duration=3000)=>{
+    const id=++_toastId;
+    setToasts(p=>[...p,{id,msg,type}]);
+    if(type!=="loading"){ timers.current[id]=setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),duration); }
+    return id;
+  },[]);
+  const update=React.useCallback((id:number,msg:string,type:ToastType="success",duration=3000)=>{
+    if(timers.current[id]) clearTimeout(timers.current[id]);
+    setToasts(p=>p.map(t=>t.id===id?{...t,msg,type}:t));
+    timers.current[id]=setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),duration);
+  },[]);
+  const ICON:Record<ToastType,string>={"loading":"⏳","success":"✓","error":"✗"};
+  const BG:Record<ToastType,string>={"loading":"#1e293b","success":"#1e293b","error":"#7F1D1D"};
+  return (
+    <ToastCtx.Provider value={show}>
+    <ToastUpdateCtx.Provider value={update}>
+      {children}
+      {toasts.map((t,i)=>(
+        <div key={t.id} role="status" aria-live="polite"
+          style={{position:"fixed",bottom:72+(i*44),left:"50%",transform:"translateX(-50%)",background:BG[t.type],color:"#fff",padding:"8px 18px",borderRadius:10,fontSize:14,zIndex:9999,pointerEvents:"none",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px rgba(0,0,0,0.3)",fontWeight:500}}>
+          <span style={{fontSize:15}}>{ICON[t.type]}</span>{t.msg}
+        </div>
+      ))}
+    </ToastUpdateCtx.Provider>
+    </ToastCtx.Provider>
+  );
 }
 function useEscapeKey(fn) {
   useEffect(()=>{
@@ -205,8 +234,6 @@ function Sel({id,dark:dk,children,...props}) {
   const c = th(dk||false);
   return <select id={id} {...props} style={{width:"100%",padding:"8px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:8,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>{children}</select>;
 }
-function useToastInstance() { return useToast(); }
-
 // ── WYSIWYG ───────────────────────────────────────────────────────────────────
 const ED_TOOLS = [
   {icon:"B",cmd:"bold"},{icon:"I",cmd:"italic"},{icon:"U",cmd:"underline"},
@@ -341,6 +368,7 @@ function TuduForm({title,action,onClose,onCreated,editTudu,dark:dk}) {
 // ── TuduDetail ────────────────────────────────────────────────────────────────
 function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
   const c = th(dk||false);
+  const {show:toast,update:toastUpdate} = useGlobalToast();
   const [editing,setEditing]   = useState(false);
   const [status,setStatus]     = useState(tudu?.estado||"Por hacer");
   const [deleting,setDeleting] = useState(false);
@@ -349,7 +377,6 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
   const [bodyText,setBodyText] = useState("");
   const [bodyLoading,setBodyLoading] = useState(true);
   const [bodyEditing,setBodyEditing] = useState(false);
-  const [bodySaving,setBodySaving]   = useState(false);
   const [bodyDraft,setBodyDraft]     = useState("");
   const titleId = "modal-tudu-detail";
   const emoji = TIPO_EMOJI[tudu?.tipo]||"📋";
@@ -423,21 +450,19 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
             <textarea value={bodyDraft} onChange={e=>setBodyDraft(e.target.value)}
               style={{width:"100%",minHeight:100,fontSize:14,lineHeight:1.7,color:c.text,background:c.surface2,border:`1px solid ${BRAND}`,borderRadius:8,padding:12,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
             <div style={{display:"flex",gap:6,marginTop:6}}>
-              <Btn sm disabled={bodySaving} onClick={async()=>{
+              <Btn sm onClick={()=>{
                 const contentChanged = bodyDraft !== bodyText;
                 if(!contentChanged){ setBodyEditing(false); return; }
-                setBodySaving(true);
-                try{
-                  const promises: Promise<any>[] = [];
-                  promises.push(updatePageContent(tudu.id,bodyDraft));
-                  if(tudu.contenido!==bodyDraft) promises.push(updateTudu(tudu.id,{contenido:bodyDraft.slice(0,2000)}));
-                  await Promise.all(promises);
-                  setBodyText(bodyDraft); setBodyEditing(false); onSaved?.();
-                }
-                catch(err){ console.error(err); }
-                finally{ setBodySaving(false); }
-              }} style={bodySaving?{opacity:0.6,cursor:"not-allowed"}:{}}>{bodySaving?"Guardando...":"Guardar"}</Btn>
-              <Btn sm ghost disabled={bodySaving} onClick={()=>{setBodyDraft(bodyText);setBodyEditing(false);}}>Cancelar</Btn>
+                const draft=bodyDraft;
+                onClose();
+                const tid=toast("Guardando...","loading");
+                const promises: Promise<any>[] = [updatePageContent(tudu.id,draft)];
+                if(tudu.contenido!==draft) promises.push(updateTudu(tudu.id,{contenido:draft.slice(0,2000)}));
+                Promise.all(promises)
+                  .then(()=>{ toastUpdate(tid,"✓ Guardado","success"); onSaved?.(); })
+                  .catch(()=>{ toastUpdate(tid,"✗ Error al guardar","error"); });
+              }}>Guardar</Btn>
+              <Btn sm ghost onClick={()=>{setBodyDraft(bodyText);setBodyEditing(false);}}>Cancelar</Btn>
             </div>
           </div>
         ):bodyText?(
@@ -632,7 +657,7 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
   const [quickVal,setQuickVal] = useState("");
   const [quickSaving,setQuickSaving] = useState(false);
   const slotRefs = useRef({});
-  const {show,Toast} = useToast();
+  const {show,update} = useGlobalToast();
 
   const SLOTS = ["Hoy","Mañana / Pasado","Esta semana","Próxima semana"];
   const withMoves = allTudus.map(t=>movedIds[t.id]?{...t,cuando:movedIds[t.id]}:t);
@@ -657,12 +682,15 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
     const item=allTudus.find(p=>p.id===dragId);
     flyTo(e.clientX,e.clientY,slotRefs.current[slot],item?.c?.bg||"#FEF08A");
     const movedId=dragId;
+    const prevCuando=item?.cuando;
     setDragId(null);setOverSlot(null);
     const cuando = SLOT_TO_CUANDO[slot];
     if(cuando){
       setMovedIds(p=>({...p,[movedId]:cuando}));
-      show("Asignado a: "+slot);
-      try{ await updateTudu(movedId,{cuando}); onRefresh?.(); }catch(err){ console.error(err); show("Error al mover"); onRefresh?.(); }
+      const tid=show("Guardando...","loading");
+      updateTudu(movedId,{cuando})
+        .then(()=>{ update(tid,"✓ Asignado a: "+slot,"success"); onRefresh?.(); })
+        .catch(()=>{ setMovedIds(p=>{const n={...p};if(prevCuando)n[movedId]=prevCuando;else delete n[movedId];return n;}); update(tid,"✗ Error al mover","error"); });
     }
   };
 
@@ -672,9 +700,9 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
     try{
       await createTudu({title:quickVal.trim(),categoria:"Inbox",estado:"Por hacer",cuando:"Sin fecha"});
       setQuickVal("");
-      show("Tudú creado en Inbox");
+      show("Tudú creado en Inbox","success");
       onRefresh?.();
-    }catch(err){ console.error(err); show("Error al crear"); }
+    }catch(err){ console.error(err); show("Error al crear","error"); }
     finally{ setQuickSaving(false); }
   };
 
@@ -739,7 +767,6 @@ function Dashboard({tudus:rawTudus,loading,onNew,onTudu,onRefresh,dark:dk,isMobi
           </div>
         </section>
       )}
-      <Toast/>
     </main>
   );
 }
@@ -1338,6 +1365,7 @@ export default function App() {
   const c = th(dark);
 
   return (
+    <GlobalToastProvider>
     <div style={{height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden",background:c.bg,color:c.text}}>
       <style>{`*{box-sizing:border-box}*:focus-visible{outline:2px solid ${BRAND};outline-offset:2px}`}</style>
 
@@ -1410,5 +1438,6 @@ export default function App() {
       {showTudu && <TuduDetail tudu={selectedTudu} onClose={()=>{setShowTudu(false);setSelectedTudu(null);}} onPomo={()=>{setShowTudu(false);setShowPomo(true);}} onSaved={refresh} dark={dark}/>}
       {showPomo && <PomoWidget onClose={()=>setShowPomo(false)} onOpenTask={()=>setShowTudu(true)} isMobile={isMobile} dark={dark}/>}
     </div>
+    </GlobalToastProvider>
   );
 }
