@@ -275,60 +275,33 @@ function WysiwygEditor({placeholder,id,dark:dk}) {
   );
 }
 
-// ── DatePicker (campo Fecha unificado) ────────────────────────────────────────
+// ── DatePicker (campo Fecha unificado — siempre visible, sin popup) ──────────
 const CUANDO_PICKER = ["Sin fecha","Hoy","Mañana","Esta semana","Próxima semana","Este mes","Algún día","Fecha exacta"];
 function DatePicker({cuando,deadline,onChange,dark:dk}) {
   const c = th(dk||false);
-  const [open,setOpen] = useState(false);
-  const [tmpCuando,setTmpCuando] = useState(cuando||"Sin fecha");
-  const [tmpDate,setTmpDate] = useState(deadline||"");
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [rect,setRect] = useState<{top:number,left:number,width:number}|null>(null);
-  const fmtDl = (dl:string) => { if(!dl) return ""; try{ return toLocal(dl); }catch{ return dl; } };
-  const display = cuando==="Sin fecha" && !deadline ? "Sin fecha" : cuando==="Fecha exacta" ? (deadline?fmtDl(deadline):"Elegir fecha") : `${cuando}${deadline?" · "+fmtDl(deadline):""}`;
-  const toggle=()=>{
-    setTmpCuando(cuando||"Sin fecha");setTmpDate(deadline||"");
-    if(!open&&btnRef.current){const r=btnRef.current.getBoundingClientRect();setRect({top:r.bottom+4,left:r.left,width:Math.max(r.width,260)});}
-    setOpen(!open);
-  };
+  const todayISO = toISO(new Date());
+  // Derive internal cuando: if parent has a relative cuando, use it; if only deadline, "Fecha exacta"
+  const cuandoVal = cuando && cuando!=="Sin fecha" ? cuando : (deadline ? "Fecha exacta" : "Sin fecha");
   // Dropdown → auto-calc date and sync to calendar
   const handleCuandoChange=(val:string)=>{
-    setTmpCuando(val);
-    if(val==="Sin fecha"){ setTmpDate(""); }
-    else if(val!=="Fecha exacta"){ const calc=calcDate(val); if(calc) setTmpDate(calc); }
+    if(val==="Sin fecha"){ onChange("Sin fecha",null); }
+    else if(val==="Fecha exacta"){ onChange("Sin fecha",deadline||todayISO); }
+    else { const calc=calcDate(val); onChange(val,calc||null); }
   };
   // Calendar → set dropdown to "Fecha exacta"
   const handleDateChange=(val:string)=>{
-    setTmpDate(val);
-    if(val) setTmpCuando("Fecha exacta");
-    else setTmpCuando("Sin fecha");
+    if(val){ onChange("Sin fecha",val); }
+    else { onChange("Sin fecha",null); }
   };
-  const save=()=>{
-    const finalCuando = tmpCuando==="Fecha exacta" ? "Sin fecha" : tmpCuando;
-    onChange(finalCuando, tmpDate||null);
-    setOpen(false);
-  };
-  const todayISO = toISO(new Date());
   return (
-    <div style={{position:"relative"}}>
-      <button ref={btnRef} type="button" onClick={toggle}
-        style={{width:"100%",padding:"8px 12px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:8,background:c.surface,color:c.text,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
-        {display}
-      </button>
-      {open&&rect&&(
-        <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:rect.top,left:rect.left,width:rect.width,zIndex:9998,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
-          <select value={tmpCuando} onChange={e=>handleCuandoChange(e.target.value)}
-            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}>
-            {CUANDO_PICKER.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
-          </select>
-          <input type="date" value={tmpDate||todayISO} onChange={e=>handleDateChange(e.target.value)}
-            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:10,fontFamily:"inherit",colorScheme:dk?"dark":"light"}}/>
-          <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-            <Btn sm ghost onClick={()=>setOpen(false)}>Cancelar</Btn>
-            <Btn sm onClick={save}>Guardar</Btn>
-          </div>
-        </div>
-      )}
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      <select value={cuandoVal} onChange={e=>handleCuandoChange(e.target.value)}
+        style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>
+        {CUANDO_PICKER.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
+      </select>
+      <input type="date" value={deadline||""} onChange={e=>handleDateChange(e.target.value)}
+        min={todayISO}
+        style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit",colorScheme:dk?"dark":"light"}}/>
     </div>
   );
 }
@@ -380,10 +353,8 @@ function TuduForm({title:formTitle,action,onClose,onCreated,editTudu,dark:dk,def
         <Fld label="Estado" id="f-estado"><Sel id="f-estado" dark={dk} value={estado} onChange={e=>setEstado(e.target.value)}>{ESTADOS_DEFAULT.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}</Sel></Fld>
         <Fld label="Categoría" id="f-cat"><Sel id="f-cat" dark={dk} value={cat} onChange={e=>setCat(e.target.value)}>{CATEGORIAS_NAMES.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}</Sel></Fld>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk} value={tipo} onChange={e=>setTipo(e.target.value)}>{TIPOS_CLEAN.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{(TIPO_EMOJI[v]||"📋")+" "+v}</option>)}</Sel></Fld>
-        <Fld label="Fecha" id="f-fecha"><DatePicker cuando={cuando} deadline={deadline} onChange={(c,d)=>{setCuando(c);setDeadline(d||"");}} dark={dk}/></Fld>
-      </div>
+      <Fld label="Tipo" id="f-tipo"><Sel id="f-tipo" dark={dk} value={tipo} onChange={e=>setTipo(e.target.value)}>{TIPOS_CLEAN.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{(TIPO_EMOJI[v]||"📋")+" "+v}</option>)}</Sel></Fld>
+      <Fld label="Fecha" id="f-fecha"><DatePicker cuando={cuando} deadline={deadline} onChange={(c,d)=>{setCuando(c);setDeadline(d||"");}} dark={dk}/></Fld>
       <Fld label="Etiquetas" id="f-tags"><Inp id="f-tags" dark={dk} placeholder="trabajo, urgente... (coma)" value={tags} onChange={e=>setTags(e.target.value)}/></Fld>
       <Fld label="Contenido" id="f-content">
         <textarea value={contenido} onChange={e=>setContenido(e.target.value)} placeholder="Notas, descripción..."
@@ -504,19 +475,19 @@ function TuduDetail({tudu,onClose,onPomo,onSaved,dark:dk}) {
         </div>
       </div>
 
-      {/* Row 2: Tipo | Fecha */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-        <div>
-          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Tipo</div>
-          <select value={tipo} onChange={e=>setTipo(e.target.value)}
-            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>
-            {TIPOS_CLEAN.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{(TIPO_EMOJI[v]||"📋")+" "+v}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Fecha</div>
-          <DatePicker cuando={cuando} deadline={deadline} onChange={(cu,dl)=>{setCuando(cu);setDeadline(dl||"");}} dark={dk}/>
-        </div>
+      {/* Row 2: Tipo */}
+      <div style={{marginBottom:8}}>
+        <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Tipo</div>
+        <select value={tipo} onChange={e=>setTipo(e.target.value)}
+          style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",fontFamily:"inherit"}}>
+          {TIPOS_CLEAN.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{(TIPO_EMOJI[v]||"📋")+" "+v}</option>)}
+        </select>
+      </div>
+
+      {/* Row 3: Fecha (dropdown + calendario siempre visibles) */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:".4px",color:c.textFaint,marginBottom:3}}>Fecha</div>
+        <DatePicker cuando={cuando} deadline={deadline} onChange={(cu,dl)=>{setCuando(cu);setDeadline(dl||"");}} dark={dk}/>
       </div>
 
       {/* Contenido */}
