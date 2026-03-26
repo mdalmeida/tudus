@@ -276,6 +276,7 @@ function WysiwygEditor({placeholder,id,dark:dk}) {
 }
 
 // ── DatePicker (campo Fecha unificado) ────────────────────────────────────────
+const CUANDO_PICKER = ["Sin fecha","Hoy","Mañana","Esta semana","Próxima semana","Este mes","Algún día","Fecha exacta"];
 function DatePicker({cuando,deadline,onChange,dark:dk}) {
   const c = th(dk||false);
   const [open,setOpen] = useState(false);
@@ -283,19 +284,31 @@ function DatePicker({cuando,deadline,onChange,dark:dk}) {
   const [tmpDate,setTmpDate] = useState(deadline||"");
   const btnRef = useRef<HTMLButtonElement>(null);
   const [rect,setRect] = useState<{top:number,left:number,width:number}|null>(null);
-  const hint = tmpCuando!=="Sin fecha" ? calcDate(tmpCuando) : null;
   const fmtDl = (dl:string) => { if(!dl) return ""; try{ return toLocal(dl); }catch{ return dl; } };
-  const display = cuando==="Sin fecha" && !deadline ? "Sin fecha" : cuando==="Sin fecha" && deadline ? fmtDl(deadline) : `${cuando}${deadline?" · "+fmtDl(deadline):""}`;
+  const display = cuando==="Sin fecha" && !deadline ? "Sin fecha" : cuando==="Fecha exacta" ? (deadline?fmtDl(deadline):"Elegir fecha") : `${cuando}${deadline?" · "+fmtDl(deadline):""}`;
   const toggle=()=>{
     setTmpCuando(cuando||"Sin fecha");setTmpDate(deadline||"");
-    if(!open&&btnRef.current){const r=btnRef.current.getBoundingClientRect();setRect({top:r.bottom+4,left:r.left,width:r.width});}
+    if(!open&&btnRef.current){const r=btnRef.current.getBoundingClientRect();setRect({top:r.bottom+4,left:r.left,width:Math.max(r.width,260)});}
     setOpen(!open);
   };
+  // Dropdown → auto-calc date and sync to calendar
+  const handleCuandoChange=(val:string)=>{
+    setTmpCuando(val);
+    if(val==="Sin fecha"){ setTmpDate(""); }
+    else if(val!=="Fecha exacta"){ const calc=calcDate(val); if(calc) setTmpDate(calc); }
+  };
+  // Calendar → set dropdown to "Fecha exacta"
+  const handleDateChange=(val:string)=>{
+    setTmpDate(val);
+    if(val) setTmpCuando("Fecha exacta");
+    else setTmpCuando("Sin fecha");
+  };
   const save=()=>{
-    const dl = tmpDate || (hint ? hint : null);
-    onChange(tmpCuando, dl||null);
+    const finalCuando = tmpCuando==="Fecha exacta" ? "Sin fecha" : tmpCuando;
+    onChange(finalCuando, tmpDate||null);
     setOpen(false);
   };
+  const todayISO = toISO(new Date());
   return (
     <div style={{position:"relative"}}>
       <button ref={btnRef} type="button" onClick={toggle}
@@ -304,13 +317,12 @@ function DatePicker({cuando,deadline,onChange,dark:dk}) {
       </button>
       {open&&rect&&(
         <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:rect.top,left:rect.left,width:rect.width,zIndex:9998,background:c.surface,border:`1px solid ${BRAND}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.2)"}}>
-          <select value={tmpCuando} onChange={e=>setTmpCuando(e.target.value)}
+          <select value={tmpCuando} onChange={e=>handleCuandoChange(e.target.value)}
             style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}>
-            {CUANDO.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
+            {CUANDO_PICKER.map(v=><option key={v} style={{background:c.surface,color:c.text}}>{v}</option>)}
           </select>
-          <input type="date" value={tmpDate} onChange={e=>setTmpDate(e.target.value)}
-            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:8,fontFamily:"inherit"}}/>
-          {hint&&<div style={{fontSize:12,color:BRAND,marginBottom:8}}>→ {toLocal(hint)}</div>}
+          <input type="date" value={tmpDate||todayISO} onChange={e=>handleDateChange(e.target.value)}
+            style={{width:"100%",padding:"6px 10px",fontSize:14,border:`1px solid ${c.border}`,borderRadius:6,background:c.surface,color:c.text,outline:"none",marginBottom:10,fontFamily:"inherit",colorScheme:dk?"dark":"light"}}/>
           <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
             <Btn sm ghost onClick={()=>setOpen(false)}>Cancelar</Btn>
             <Btn sm onClick={save}>Guardar</Btn>
