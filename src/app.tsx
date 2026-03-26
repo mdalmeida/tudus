@@ -924,27 +924,78 @@ function CategoryView({tudus=[],onView,onTudu}) {
 }
 
 // ── PostitsView ───────────────────────────────────────────────────────────────
-function PostitsView({onTudu,dark:dk}) {
+function PostitsView({tudus=[],onTudu,dark:dk}) {
   const c = th(dk||false);
-  const [pos,setPos] = useState(CANVAS_INIT.reduce((a,p)=>({...a,[p.id]:{x:p.x,y:p.y}}),{}));
-  const drag = useRef(null);
+  const {show:toast,update:toastUpdate} = useGlobalToast();
+  const [pos,setPos] = useState<Record<string,{x:number,y:number}>>({});
+  const drag = useRef<{id:string,ox:number,oy:number}|null>(null);
   const moved = useRef(false);
-  const areaRef = useRef(null);
-  const onMD=(e,id)=>{const r=areaRef.current.getBoundingClientRect();drag.current={id,ox:e.clientX-r.left-pos[id].x,oy:e.clientY-r.top-pos[id].y};moved.current=false;e.preventDefault();};
-  const onMM=e=>{if(!drag.current||!areaRef.current)return;moved.current=true;const{id,ox,oy}=drag.current;const r=areaRef.current.getBoundingClientRect();setPos(p=>({...p,[id]:{x:Math.max(0,Math.min(r.width-120,e.clientX-r.left-ox)),y:Math.max(0,Math.min(r.height-100,e.clientY-r.top-oy))}}));};
-  const onMU=(e,id)=>{if(!moved.current&&id!==undefined)onTudu();drag.current=null;moved.current=false;};
+  const areaRef = useRef<HTMLDivElement|null>(null);
+  const saveTimer = useRef<Record<string,ReturnType<typeof setTimeout>>>({});
+
+  useEffect(()=>{
+    setPos(prev=>{
+      const next={...prev};
+      tudus.forEach((t:any,i:number)=>{
+        if(!next[t.id]) next[t.id]={x:20+(i%4)*160,y:16+Math.floor(i/4)*120};
+      });
+      return next;
+    });
+  },[tudus]);
+
+  const persistPos=(id:string,x:number,y:number)=>{
+    if(saveTimer.current[id]) clearTimeout(saveTimer.current[id]);
+    saveTimer.current[id]=setTimeout(()=>{
+      updateTudu(id,{color:`${Math.round(x)},${Math.round(y)}`}).catch(err=>console.error(err));
+    },600);
+  };
+
+  const onMD=(e:React.MouseEvent,id:string)=>{
+    if(!areaRef.current) return;
+    const r=areaRef.current.getBoundingClientRect();
+    const p=pos[id]||{x:0,y:0};
+    drag.current={id,ox:e.clientX-r.left-p.x,oy:e.clientY-r.top-p.y};
+    moved.current=false;
+    e.preventDefault();
+  };
+  const onMM=(e:React.MouseEvent)=>{
+    if(!drag.current||!areaRef.current)return;
+    moved.current=true;
+    const{id,ox,oy}=drag.current;
+    const r=areaRef.current.getBoundingClientRect();
+    const nx=Math.max(0,Math.min(r.width-130,e.clientX-r.left-ox));
+    const ny=Math.max(0,Math.min(r.height-100,e.clientY-r.top-oy));
+    setPos(p=>({...p,[id]:{x:nx,y:ny}}));
+  };
+  const onMU=(id:string)=>{
+    if(!moved.current&&id){
+      const t=tudus.find((t:any)=>t.id===id);
+      if(t) onTudu(t);
+    } else if(moved.current&&drag.current){
+      const mid=drag.current.id;
+      const p=pos[mid];
+      if(p) persistPos(mid,p.x,p.y);
+    }
+    drag.current=null;moved.current=false;
+  };
+
   return (
-    <div ref={areaRef} onMouseMove={onMM} onMouseUp={()=>{drag.current=null;}}
-      style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:12,height:320,position:"relative",overflow:"hidden",backgroundImage:`radial-gradient(circle,${c.border} 1px,transparent 1px)`,backgroundSize:"20px 20px"}}>
-      {CANVAS_INIT.map(p=>(
-        <div key={p.id} onMouseDown={e=>onMD(e,p.id)} onMouseUp={e=>onMU(e,p.id)}
-          style={{position:"absolute",left:pos[p.id].x,top:pos[p.id].y,background:p.bg,color:p.tx,borderRadius:8,padding:"8px 10px",fontSize:13,userSelect:"none",minWidth:95,maxWidth:135,cursor:drag.current?.id===p.id?"grabbing":"grab",boxShadow:"2px 3px 8px rgba(0,0,0,0.18)",zIndex:drag.current?.id===p.id?50:1}}>
-          <div style={{fontSize:11,opacity:.75,marginBottom:2,pointerEvents:"none"}}>{p.type}</div>
-          <div style={{fontWeight:500,lineHeight:1.3,pointerEvents:"none"}}>{p.title}</div>
-          {p.status&&<div style={{fontSize:11,padding:"1px 5px",borderRadius:3,background:"rgba(0,0,0,0.1)",marginTop:4,display:"inline-block",pointerEvents:"none"}}>{p.status}</div>}
-          <div style={{fontSize:11,opacity:.65,marginTop:3,pointerEvents:"none"}}>{p.date}</div>
-        </div>
-      ))}
+    <div ref={areaRef} onMouseMove={onMM} onMouseUp={()=>{if(drag.current&&moved.current){const mid=drag.current.id;const p=pos[mid];if(p)persistPos(mid,p.x,p.y);}drag.current=null;moved.current=false;}}
+      style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:12,height:360,position:"relative",overflow:"hidden",backgroundImage:`radial-gradient(circle,${c.border} 1px,transparent 1px)`,backgroundSize:"20px 20px"}}>
+      {tudus.length===0&&<p style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:14,color:c.textFaint}}>Sin tudús en esta categoría</p>}
+      {tudus.map((t:any,i:number)=>{
+        const p=pos[t.id];if(!p) return null;
+        const pc=PCOLORS[i%PCOLORS.length];
+        const emoji=TIPO_EMOJI[t.tipo]||"📋";
+        return (
+          <div key={t.id} onMouseDown={e=>onMD(e,t.id)} onMouseUp={()=>onMU(t.id)}
+            style={{position:"absolute",left:p.x,top:p.y,width:130,height:95,background:pc.bg,color:pc.tx,borderRadius:8,padding:"8px 10px",fontSize:13,userSelect:"none",cursor:drag.current?.id===t.id?"grabbing":"grab",boxShadow:"2px 3px 8px rgba(0,0,0,0.18)",zIndex:drag.current?.id===t.id?50:1,overflow:"hidden"}}>
+            <div style={{fontSize:11,opacity:.75,marginBottom:2,pointerEvents:"none"}}>{emoji} {t.tipo}</div>
+            <div style={{fontWeight:500,lineHeight:1.3,pointerEvents:"none"}}>{t.title}</div>
+            <div style={{fontSize:11,opacity:.6,marginTop:3,pointerEvents:"none"}}>{t.cuando||"Sin fecha"}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1129,7 +1180,7 @@ function CanvasView({tudus=[],loading,onNew,onTudu,onRefresh,dark:dk,isMobile}) 
         </div>
       </div>
       <div role="tabpanel">
-        {view==="postits"  && <PostitsView onTudu={onTudu} dark={dk}/>}
+        {view==="postits"  && <PostitsView tudus={tudus} onTudu={onTudu} dark={dk}/>}
         {view==="list"     && <ListView title="My Work" tudus={tudus} loading={loading} onTudu={onTudu} dark={dk}/>}
         {view==="kanban"   && <KanbanView tudus={tudus} mode="estado" onTudu={onTudu} onRefresh={onRefresh} dark={dk}/>}
         {view==="kplan"    && <><p style={{fontSize:13,color:c.textFaint,margin:"0 0 4px"}}>Arrastrá cards entre columnas para re-planificar</p><KanbanView tudus={tudus} mode="cuando" onTudu={onTudu} onRefresh={onRefresh} dark={dk}/></>}
@@ -1341,6 +1392,7 @@ export default function App() {
   const [showPomo,setShowPomo]   = useState(false);
   const [refreshKey,setRefreshKey] = useState(0);
   const [searchExp,setSearchExp] = useState(false);
+  const [searchQuery,setSearchQuery] = useState("");
   const [cats]                   = useState(CATS_INIT);
   const [selectedCat,setSelectedCat] = useState("My Work");
   const [allTudus,setAllTudus]   = useState<any[]>([]);
@@ -1377,25 +1429,51 @@ export default function App() {
           <span style={{display:"none",fontSize:17,fontWeight:600,color:c.text}}>tudús</span>
         </button>
 
-        <div role="search" style={{flex:1,display:"flex",justifyContent:"center",padding:"0 10px"}}>
-          <div onClick={()=>!searchExp&&setSearchExp(true)}
-            style={{display:"flex",alignItems:"center",gap:6,height:26,padding:"0 10px",borderRadius:20,cursor:searchExp?"default":"pointer",border:`1px solid ${c.border}`,background:c.surface2,width:searchExp?320:100,overflow:"hidden",transition:"width .25s ease",justifyContent:"center"}}>
+        <div role="search" style={{flex:1,display:"flex",justifyContent:"center",padding:"0 10px",position:"relative"}}>
+          <div onClick={()=>{if(!searchExp){setSearchExp(true);setSearchQuery("");}}}
+            style={{display:"flex",alignItems:"center",gap:6,height:26,padding:"0 10px",borderRadius:searchExp?"10px 10px 0 0":20,cursor:searchExp?"default":"pointer",border:`1px solid ${searchExp?BRAND:c.border}`,background:c.surface2,width:searchExp?360:100,overflow:"hidden",transition:"width .25s ease",justifyContent:"center"}}>
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
-              <circle cx="6.5" cy="6.5" r="5" stroke="#9CA3AF" strokeWidth="1.5"/>
-              <path d="M10.5 10.5L14 14" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="6.5" cy="6.5" r="5" stroke={searchExp?BRAND:"#9CA3AF"} strokeWidth="1.5"/>
+              <path d="M10.5 10.5L14 14" stroke={searchExp?BRAND:"#9CA3AF"} strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
             {!searchExp&&<span style={{fontSize:14,color:c.textFaint}}>Buscar</span>}
             {searchExp&&<>
               <label htmlFor="search-input" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"}}>Buscar</label>
-              <input id="search-input" autoFocus onBlur={()=>setSearchExp(false)}
+              <input id="search-input" autoFocus value={searchQuery}
+                onChange={e=>setSearchQuery(e.target.value)}
+                onBlur={()=>setTimeout(()=>{setSearchExp(false);setSearchQuery("");},150)}
+                onKeyDown={e=>{if(e.key==="Escape"){setSearchExp(false);setSearchQuery("");}}}
                 style={{flex:1,fontSize:14,border:"none",background:"transparent",outline:"none",color:c.text,minWidth:0}}
                 placeholder="Buscar tudús..."/>
-              <select onMouseDown={e=>e.stopPropagation()}
-                style={{fontSize:13,border:"none",background:"transparent",outline:"none",color:c.textFaint,cursor:"pointer",flexShrink:0}}>
-                <option>Todas</option><option>Esta categoría</option><option>Otra categoría</option>
-              </select>
+              {searchQuery&&<button type="button" onClick={()=>setSearchQuery("")} style={{background:"none",border:"none",color:c.textFaint,cursor:"pointer",fontSize:14,padding:0,lineHeight:1}}>✕</button>}
             </>}
           </div>
+          {searchExp&&searchQuery.trim().length>0&&(()=>{
+            const q=searchQuery.trim().toLowerCase();
+            const results=allTudus.filter((t:any)=>t.title.toLowerCase().includes(q)).slice(0,8);
+            return results.length>0?(
+              <div style={{position:"absolute",top:26,left:"50%",transform:"translateX(-50%)",width:360,background:c.surface,border:`1px solid ${BRAND}`,borderTop:"none",borderRadius:"0 0 10px 10px",boxShadow:"0 8px 24px rgba(0,0,0,0.2)",zIndex:200,maxHeight:280,overflowY:"auto"}}>
+                {results.map((t:any)=>{
+                  const emoji=TIPO_EMOJI[t.tipo]||"📋";
+                  return (
+                    <button key={t.id} type="button"
+                      onMouseDown={e=>{e.preventDefault();openTudu(t);setSearchExp(false);setSearchQuery("");}}
+                      style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 12px",background:"none",border:"none",borderBottom:`1px solid ${c.border}`,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}>
+                      <span style={{fontSize:14,flexShrink:0}}>{emoji}</span>
+                      <div style={{flex:1,overflow:"hidden"}}>
+                        <div style={{fontSize:14,color:c.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</div>
+                        <div style={{fontSize:11,color:c.textFaint}}>{t.categoria} · {t.estado}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ):searchQuery.trim().length>=2?(
+              <div style={{position:"absolute",top:26,left:"50%",transform:"translateX(-50%)",width:360,background:c.surface,border:`1px solid ${BRAND}`,borderTop:"none",borderRadius:"0 0 10px 10px",boxShadow:"0 8px 24px rgba(0,0,0,0.2)",zIndex:200,padding:"12px",textAlign:"center"}}>
+                <span style={{fontSize:13,color:c.textFaint}}>Sin resultados</span>
+              </div>
+            ):null;
+          })()}
         </div>
 
         <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:"auto"}}>
